@@ -6,8 +6,13 @@ Thanks for your interest in this project.
 
 **Pull requests are not being accepted.** This is a single-maintainer project with
 a deliberately narrow scope, and reviewing outside changes is not something I can
-commit to right now. PRs opened against this repository will be closed unread —
-that is a statement about my capacity, not about the work in them.
+commit to right now. PRs opened against this repository are **closed
+automatically, unread** — that is a statement about my capacity, not about the
+work in them.
+
+GitHub has no setting that turns pull requests off on a public repository, so the
+close is done by [a workflow](.github/workflows/close-external-prs.yml) rather
+than by a wall. Nothing personal is meant by it.
 
 If you need different behaviour, the MIT licence lets you fork freely. You do not
 need my permission, and you do not need to ask.
