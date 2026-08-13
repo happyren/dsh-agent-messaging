@@ -123,8 +123,7 @@ export function apply(ctx: Context, config: Config): void {
   }, 'dsh-agent-messaging:tools')
 
   // Presence must describe what is live *now*: republish whenever the set of
-  // local agents changes, and drain anything spooled for an agent that just
-  // came up.
+  // local agents changes.
   const republish = (): void => {
     void presence
       .publish(ctx.agents.list().map((agent) => agent.id))
@@ -133,11 +132,17 @@ export function apply(ctx: Context, config: Config): void {
       })
   }
 
-  ctx.on('agent/created', ({ agent }) => {
-    republish()
+  ctx.on('agent/created', () => republish())
+  ctx.on('agent/disposed', () => republish())
+
+  // Spooled messages are released at `agent/session-start`, not `agent/created`:
+  // creation is composition-only, and this is the first point the harness
+  // designates for seeding model-facing context. It fires on resume as well as a
+  // fresh start, and re-draining on a `clear` or `compact` restart costs nothing
+  // while closing the race where a message is spooled as the agent comes up.
+  ctx.on('agent/session-start', ({ agent }) => {
     void deliverSpooled(agent.id)
   })
-  ctx.on('agent/disposed', () => republish())
 
   const deliverSpooled = async (sessionId: string): Promise<void> => {
     if (!config.spoolOffline) return
