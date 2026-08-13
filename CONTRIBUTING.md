@@ -14,7 +14,7 @@ need my permission, and you do not need to ask.
 
 ## Discussions are open
 
-[Discussions](https://github.com/kaixiangren/dsh-agent-messaging/discussions) are
+[Discussions](https://github.com/happyren/dsh-agent-messaging/discussions) are
 the right place for everything else, and genuinely welcome:
 
 - **Bug reports** — what you did, what happened, what you expected. Include your
@@ -32,7 +32,7 @@ me something I could not have found alone.
 ## Security
 
 Please do **not** open a public discussion for a security issue. Report it privately
-through [GitHub's security advisory form](https://github.com/kaixiangren/dsh-agent-messaging/security/advisories/new).
+through [GitHub's security advisory form](https://github.com/happyren/dsh-agent-messaging/security/advisories/new).
 
 Things I consider security-relevant: anything that lets a peer message escape the
 untrusted-content framing and be read as instructions, impersonate another session,

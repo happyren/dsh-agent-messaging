@@ -32,8 +32,10 @@ describe('renderInbound', () => {
     expect(text).toContain('"delivery":"followup"')
   })
 
-  it('tells the receiver how to reply', () => {
-    expect(renderInbound(envelope('done'))).toMatch(/peer_send with to: "alpha" and reply_to: "msg-1"/)
+  it('addresses the reply by session id, which cannot drift like a display name', () => {
+    expect(renderInbound(envelope('done'))).toMatch(
+      /peer_send with to: "session-a" and reply_to: "msg-1"/,
+    )
   })
 
   it('records the correlated message when replying', () => {

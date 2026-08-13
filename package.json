@@ -14,11 +14,11 @@
   "author": "Kaixiang Ren",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kaixiangren/dsh-agent-messaging.git"
+    "url": "git+https://github.com/happyren/dsh-agent-messaging.git"
   },
-  "homepage": "https://github.com/kaixiangren/dsh-agent-messaging#readme",
+  "homepage": "https://github.com/happyren/dsh-agent-messaging#readme",
   "bugs": {
-    "url": "https://github.com/kaixiangren/dsh-agent-messaging/discussions"
+    "url": "https://github.com/happyren/dsh-agent-messaging/discussions"
   },
   "type": "module",
   "main": "lib/index.js",

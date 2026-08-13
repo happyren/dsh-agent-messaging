@@ -62,7 +62,10 @@ export function renderInbound(envelope: Envelope): string {
     OPEN_TAG,
     tagSafeJson(payload),
     CLOSE_TAG,
-    `To answer, call peer_send with to: "${envelope.from.name}" and reply_to: "${envelope.id}".`,
+    // Address the reply by session id, not by display name: the name is derived
+    // per listing and can change when the sender's title is refolded, while the
+    // id is stable and matches resolution's most exact tier.
+    `To answer, call peer_send with to: "${envelope.from.sessionId}" and reply_to: "${envelope.id}".`,
   ].join('\n')
 }
 

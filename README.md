@@ -36,7 +36,7 @@ A message is text. Never conversation history, never files.
 ## Install
 
 ```bash
-npx -p @deepseek-ai/dsh dsh plugin --profile web add github:kaixiangren/dsh-agent-messaging
+npx -p @deepseek-ai/dsh dsh plugin --profile web add github:happyren/dsh-agent-messaging
 ```
 
 The package ships a self-contained `prepare` script, and pnpm ≥10 blocks build
@@ -48,7 +48,7 @@ allowBuilds:
   dsh-agent-messaging: true
 ```
 
-then re-run the `add`. Pin a commit (`github:kaixiangren/dsh-agent-messaging#<sha>`)
+then re-run the `add`. Pin a commit (`github:happyren/dsh-agent-messaging#<sha>`)
 so a later push cannot change what runs on your machine.
 
 Restart the profile afterwards. Verify the layer loaded:
@@ -185,7 +185,7 @@ files rather than mocks.
 ## Contributing
 
 Code contributions are not being accepted, but questions, bug reports and ideas are
-welcome in [Discussions](https://github.com/kaixiangren/dsh-agent-messaging/discussions).
+welcome in [Discussions](https://github.com/happyren/dsh-agent-messaging/discussions).
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
