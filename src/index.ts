@@ -61,7 +61,10 @@ export function apply(ctx: Context, config: Config): void {
     logger,
   })
 
-  const sink = new AgentInboxSink(ctx.agents)
+  const sink = new AgentInboxSink(ctx.agents, {
+    authority: config.peerAuthority,
+    trustedPeers: config.trustedPeers,
+  })
   const inbound = new InboundRouter({
     policy: config.inbound,
     guard: new LoopGuard({

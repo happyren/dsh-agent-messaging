@@ -11,6 +11,16 @@ import Schema from '@deepseek-ai/schemastery'
 export interface Config {
   /** What this session does with messages arriving from peers. */
   inbound: 'accept' | 'hold' | 'refuse'
+  /**
+   * Whether an authorised peer's request may be acted on directly.
+   *
+   * Prompt-level only: it changes what the receiving model is told, and grants
+   * nothing. The session's own permission rules and sandbox are the enforcement
+   * boundary at every level.
+   */
+  peerAuthority: 'inform' | 'act'
+  /** Peers authorised by `peerAuthority: act`, by display name or session id. */
+  trustedPeers: string[]
   /** Absolute directory for presence records and the offline spool. Defaults under `$DSH_HOME`. */
   stateRoot?: string
   /** Whether sessions created as subagent children are addressable as peers. */
@@ -37,6 +47,14 @@ export const Config: Schema<Config> = Schema.object({
   inbound: Schema.union(['accept', 'hold', 'refuse'] as const)
     .default('accept')
     .description('What this session does with messages arriving from peer sessions.'),
+  peerAuthority: Schema.union(['inform', 'act'] as const)
+    .default('inform')
+    .description(
+      'Whether an authorised peer may be acted on directly. Prompt-level only — your permission rules still bound every action.',
+    ),
+  trustedPeers: Schema.array(Schema.string())
+    .default([])
+    .description('Peers authorised by peerAuthority: act, matched exactly on display name or session id.'),
   stateRoot: Schema.string().description(
     'Absolute directory for presence records and the offline spool. Defaults to $DSH_HOME/agent-messaging.',
   ),

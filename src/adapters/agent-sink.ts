@@ -10,6 +10,7 @@ import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
+import { decideAuthority, type AuthorityPolicy } from '../domain/authority.ts'
 import type { Envelope } from '../domain/envelope.ts'
 import { renderInbound } from '../domain/render.ts'
 import type { DeliveryReceipt, InboxSink } from '../ports/index.ts'
@@ -32,9 +33,11 @@ export interface PeerMessageSource {
 /** Routes admitted envelopes into live agents through the agent registry. */
 export class AgentInboxSink implements InboxSink {
   readonly #agents: AgentRegistry
+  readonly #authority: AuthorityPolicy
 
-  constructor(agents: AgentRegistry) {
+  constructor(agents: AgentRegistry, authority: AuthorityPolicy) {
     this.#agents = agents
+    this.#authority = authority
   }
 
   /**
@@ -49,8 +52,9 @@ export class AgentInboxSink implements InboxSink {
     }
 
     const source: PeerMessageSource = { kind: 'plugin', plugin: PLUGIN_NAME, form: 'relay' }
+    const authority = decideAuthority(this.#authority, envelope.from)
     const message = createUserMessage({
-      content: [{ type: 'text', text: renderInbound(envelope) }],
+      content: [{ type: 'text', text: renderInbound(envelope, authority) }],
       source,
     })
 
