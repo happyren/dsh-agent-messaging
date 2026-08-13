@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="docs/media/social-card.png" width="900"
+       alt="dsh-agent-messaging — the payments-api session sends a steer to the checkout-client session, carrying &quot;tenant_id is now required&quot;. Delivery modes: steer interrupts, followup opens a new turn, context does not wake.">
+</p>
+
+<p align="center">
+  <a href="https://github.com/happyren/dsh-agent-messaging/releases/tag/v0.0.1"><img src="https://img.shields.io/github/v/release/happyren/dsh-agent-messaging?color=5B7CFF&label=release" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-5B7CFF" alt="MIT"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-topic-5B7CFF" alt="dsh-plugin topic"></a>
+</p>
+
 # dsh-agent-messaging
 
 Cross-session agent-to-agent messaging for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
