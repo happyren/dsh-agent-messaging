@@ -1,0 +1,152 @@
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-a: #080C18;
+    --bg-b: #131C38;
+    --surface: #161E3A;
+    --border: #2B3860;
+    --text: #F4F7FF;
+    --dim: #8C9CC6;
+    --accent: #5B7CFF;
+    --amber: #FFAE4B;
+    --mint: #46D9A8;
+  }
+
+  body {
+    width: 1280px; height: 640px;
+    display: flex; flex-direction: column; justify-content: center; gap: 52px;
+    padding: 64px 76px;
+    background:
+      radial-gradient(1100px 520px at 82% -12%, rgba(91,124,255,.22), transparent 62%),
+      linear-gradient(155deg, var(--bg-a), var(--bg-b));
+    font-family: 'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text);
+    position: relative; overflow: hidden;
+  }
+
+  /* faint dot grid */
+  body::before {
+    content: ''; position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,.055) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: linear-gradient(to bottom, #000 12%, transparent 78%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 12%, transparent 78%);
+  }
+
+  .row { position: relative; z-index: 1; }
+
+  /* ---------- header ---------- */
+  .eyebrow {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 17px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 20px;
+  }
+  h1 { font-size: 68px; font-weight: 700; letter-spacing: -.028em; line-height: 1; }
+  .tagline {
+    margin-top: 18px; font-size: 25px; line-height: 1.4; color: var(--dim);
+    max-width: 960px; font-weight: 400;
+  }
+  .tagline b { color: #C6D2F2; font-weight: 600; }
+
+  /* ---------- diagram ---------- */
+  .diagram { display: flex; align-items: center; gap: 0; margin: 4px 0 2px; }
+
+  .node {
+    width: 322px; padding: 20px 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.34);
+  }
+  .node-top { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.run { background: var(--mint); box-shadow: 0 0 0 4px rgba(70,217,168,.16); }
+  .dot.idle { background: #5C6C96; box-shadow: 0 0 0 4px rgba(92,108,150,.14); }
+  .node-name {
+    font-family: 'SF Mono', Menlo, monospace; font-size: 20px; font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .node-sub {
+    margin-top: 9px; font-family: 'SF Mono', Menlo, monospace;
+    font-size: 15px; color: var(--dim);
+  }
+
+  /* the beam */
+  .link { flex: 1; position: relative; height: 74px; }
+  .beam {
+    position: absolute; top: 50%; left: -1px; right: 12px; height: 3px; border-radius: 2px;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, rgba(91,124,255,.55), var(--accent) 52%, var(--amber));
+  }
+  .head {
+    position: absolute; top: 50%; right: 0; transform: translateY(-50%);
+    width: 0; height: 0;
+    border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+    border-left: 13px solid var(--amber);
+  }
+  .pill {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 16px; border-radius: 999px;
+    background: #241C10; border: 1px solid rgba(255,174,75,.5);
+    font-family: 'SF Mono', Menlo, monospace; font-size: 16px; color: var(--amber);
+    white-space: nowrap; box-shadow: 0 10px 26px rgba(0,0,0,.4);
+  }
+  .msg {
+    position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%);
+    font-size: 15px; color: var(--dim); white-space: nowrap;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  /* ---------- footer ---------- */
+  .footer { display: flex; align-items: center; justify-content: space-between; }
+  .modes { display: flex; gap: 10px; }
+  .chip {
+    padding: 9px 15px; border-radius: 9px;
+    background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.10);
+    font-family: 'SF Mono', Menlo, monospace; font-size: 15.5px; color: #B7C4E6;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  .repo {
+    font-family: 'SF Mono', Menlo, monospace; font-size: 16px; color: #6E7EA8;
+  }
+</style>
+
+<div class="row">
+  <div class="eyebrow">DeepSeek Harness plugin</div>
+  <h1>dsh-agent-messaging</h1>
+  <div class="tagline">
+    Your sessions can finally talk to each other — one names another and
+    <b>delivers a message into its inbox.</b> Across worktrees, across processes.
+  </div>
+</div>
+
+<div class="row diagram">
+  <div class="node">
+    <div class="node-top"><span class="dot run"></span><span class="node-name">payments-api</span></div>
+    <div class="node-sub">api/charges.ts</div>
+  </div>
+
+  <div class="link">
+    <div class="beam"></div>
+    <div class="head"></div>
+    <div class="pill">peer_send · mode: steer</div>
+    <div class="msg">“tenant_id is now required”</div>
+  </div>
+
+  <div class="node">
+    <div class="node-top"><span class="dot idle"></span><span class="node-name">checkout-client</span></div>
+    <div class="node-sub">client/checkout.ts</div>
+  </div>
+</div>
+
+<div class="row footer">
+  <div class="modes">
+    <div class="chip"><b>steer</b> interrupt</div>
+    <div class="chip"><b>followup</b> new turn</div>
+    <div class="chip"><b>context</b> no wake</div>
+  </div>
+  <div class="repo">MIT · happyren/dsh-agent-messaging</div>
+</div>
