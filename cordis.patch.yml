@@ -1,0 +1,4 @@
+- insert:
+    - id: agent-messaging
+      name: dsh-agent-messaging
+      config: {}
