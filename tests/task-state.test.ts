@@ -190,3 +190,43 @@ describe('TaskStateStore', () => {
     expect(findWaitCycle([...(await s.readAll())], 'a').map((e) => e.sessionId)).toEqual(['a', 'b'])
   })
 })
+
+describe('an unresolved blocker breaks cycle detection', () => {
+  it('finds no cycle when one side stored a name instead of a session id', () => {
+    // Found in a live run: docs declared itself blocked on the alias
+    // "checkout-client", which resolution did not recognise, so the string was
+    // stored verbatim. Checkout blocked back correctly by id — and the chain
+    // dead-ended at a session that does not exist, hiding a real deadlock.
+    const docs = createTaskState({
+      sessionId: 'session-docs',
+      name: 'docs',
+      phase: 'blocked',
+      summary: 'waiting on the call signature',
+      blockedOn: 'checkout-client',
+      now: 0,
+    })
+    const checkout = createTaskState({
+      sessionId: 'session-checkout',
+      name: 'checkout',
+      phase: 'blocked',
+      summary: 'waiting on the docs',
+      blockedOn: 'session-docs',
+      now: 0,
+    })
+    expect(findWaitCycle([docs, checkout], 'session-checkout')).toEqual([])
+
+    // Resolved to the id, the same declarations are a detectable mutual wait.
+    const resolved = createTaskState({
+      sessionId: 'session-docs',
+      name: 'docs',
+      phase: 'blocked',
+      summary: 'waiting on the call signature',
+      blockedOn: 'session-checkout',
+      now: 0,
+    })
+    expect(findWaitCycle([resolved, checkout], 'session-checkout').map((s) => s.sessionId)).toEqual([
+      'session-checkout',
+      'session-docs',
+    ])
+  })
+})

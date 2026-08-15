@@ -167,9 +167,18 @@ export function apply(ctx: Context, config: Config): void {
   /**
    * Resolve a peer address to its session id, so a wait graph built from
    * human-written names still has one vocabulary.
+   *
+   * A card alias is checked FIRST, because it is the handle a session publishes
+   * about itself and therefore the one a peer reads and repeats. Matching only
+   * the folded display name silently stores the alias as an opaque string, and a
+   * wait chain that ends in an unresolved string is a cycle nobody detects.
    */
   const resolveSessionId = async (address: string, signal?: AbortSignal): Promise<string | undefined> => {
     const wanted = address.trim().toLowerCase()
+    const published = await cards.readAll()
+    const byAlias = published.find((card) => card.alias === wanted)
+    if (byAlias) return byAlias.sessionId
+
     const peers = await directory.list(signal)
     return peers.find((peer) => peer.sessionId === address || peer.name.toLowerCase() === wanted)?.sessionId
   }

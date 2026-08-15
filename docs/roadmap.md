@@ -97,6 +97,28 @@ Versioning is [semantic](https://semver.org): a new tool is a feature and takes 
 minor bump, a behaviour fix takes a patch. The `0.0.x` line below `0.1.0` is
 pre-correction history and is left as it shipped.
 
+### The whole scenario, on a real host
+
+`v0.9.1` was the point at which the storyline in
+`tests/scenario.integration.test.ts` was also driven through a real `dsh web`
+instance with real models, four sessions and real files — not simulated. It
+produced the same numbers the deterministic test predicts:
+
+```
+3 receiver turns spent, 3 problems caught
+  collisions avoided   1
+  false claims caught  1
+  deadlocks detected   1
+```
+
+Each was a real event: checkout was refused `api/` because payments held
+`api/charges.ts` beneath it; payments read the file and refuted a false currency
+claim; docs and checkout deadlocked and were told at the moment the cycle closed;
+and a fourth session, told nothing about the history, found the deferral in the
+ledger and declined to reopen it.
+
+The run also found a bug the deterministic test could not: see `v0.9.1` below.
+
 ### Verified in a live host
 
 `v0.0.3` and `v0.0.4` were exercised against two real sessions in one `dsh web`
