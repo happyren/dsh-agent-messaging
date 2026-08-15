@@ -296,6 +296,38 @@ in the counts. Second, guidance that a run proves load-bearing belongs under tes
 (`tests/tool-guidance.test.ts`) — a description is exactly the kind of thing an
 edit trims without noticing.
 
+## Found by the benchmark: stale peers diffuse responsibility
+
+The first run of the coordination benchmark produced an invalid measurement and
+a real finding at the same time.
+
+In the `stale-contract` scenario, the client session read the decision ledger,
+found the new `tenant_id` requirement, and then declined to act on it:
+
+> that's assigned to the client-update sessions (`update-client-for-tenant-id-requ`
+> etc.), not part of my loyalty-points task, so I left it for them
+
+Every step of that reasoning is sound. It listed its peers, read their titles,
+and inferred ownership from them. The sessions it deferred to were dead — leftovers
+from an earlier run — and nothing in the listing said so loudly enough to matter.
+
+The plugin currently reports liveness (`idle`, `running`, `not running`) and, since
+v0.0.6, a declared task state. Neither was enough: a *title* is a strong signal and
+an unreliable one, and a long-lived workspace accumulates titles that describe work
+nobody is doing.
+
+Candidate answers, none built yet:
+
+- **Age out the listing.** A session with no activity for hours is not a colleague;
+  say so, or drop it.
+- **Make deferral explicit.** A peer that believes work belongs to another session
+  could be required to address that session rather than infer from a listing —
+  a `blocked_on` that must resolve to something live.
+- **Report the corpus honestly.** "12 sessions, 2 live, 10 last active >6h ago" is a
+  different prompt from twelve equal-looking names.
+
+The measurement this invalidated is kept in `bench/results/` rather than deleted.
+
 ## Deliberately not building
 
 - **Debate or voting among peers.** The evidence is against it at equal budget,

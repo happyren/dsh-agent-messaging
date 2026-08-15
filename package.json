@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-messaging",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Cross-session agent-to-agent messaging for DeepSeek Harness: claims, verification and a decision ledger, so two agent sessions don't repeat, contradict or deadlock each other.",
   "keywords": [
     "dsh",
@@ -69,7 +69,8 @@
     "test:watch": "vitest",
     "verify": "npm run typecheck && npm run test && npm run build",
     "report": "node scripts/report.mjs",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "bench": "node bench/run.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.0",
