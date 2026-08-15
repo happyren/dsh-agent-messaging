@@ -152,7 +152,7 @@ termination (6.2%)**. This is common ground in Klein's sense: a teammate that
 cannot signal completion or blockage cannot be coordinated with
 ([Klein et al.][klein]).
 
-### v0.3.0 — Shared decision ledger
+### v0.3.0 — Shared decision ledger  ✅ shipped
 
 An append-only record of what was decided, by whom, on what evidence, readable
 by any session at any time.
