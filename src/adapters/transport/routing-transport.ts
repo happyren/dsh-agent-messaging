@@ -11,7 +11,7 @@ import type { InboundRouter } from '../../app/receive-message.ts'
 import type { Envelope } from '../../domain/envelope.ts'
 import { PeerError } from '../../domain/errors.ts'
 import type { PeerDescriptor } from '../../domain/peer.ts'
-import type { DeliveryReceipt, OutboxSpool, PeerTransport } from '../../ports/index.ts'
+import { noMetrics, type DeliveryReceipt, type MetricsSink, type OutboxSpool, type PeerTransport } from '../../ports/index.ts'
 import type { InboxClient } from './inbox-client.ts'
 
 /** Construction inputs for {@link RoutingTransport}. */
@@ -21,6 +21,8 @@ export interface RoutingTransportOptions {
   readonly spool: OutboxSpool
   /** Whether a message to a non-running session is spooled or rejected. */
   readonly spoolOffline: boolean
+  /** Where spooling is counted. Defaults to counting nothing. */
+  readonly metrics?: MetricsSink
 }
 
 /** Routes an envelope to a local agent, a peer host, or the offline spool. */
@@ -29,12 +31,14 @@ export class RoutingTransport implements PeerTransport {
   readonly #client: InboxClient
   readonly #spool: OutboxSpool
   readonly #spoolOffline: boolean
+  readonly #metrics: MetricsSink
 
   constructor(options: RoutingTransportOptions) {
     this.#inbound = options.inbound
     this.#client = options.client
     this.#spool = options.spool
     this.#spoolOffline = options.spoolOffline
+    this.#metrics = options.metrics ?? noMetrics
   }
 
   /**
@@ -61,6 +65,7 @@ export class RoutingTransport implements PeerTransport {
           )
         }
         await this.#spool.hold(envelope)
+        this.#metrics.record('message-spooled')
         return {
           status: 'spooled',
           detail: `Session "${peer.name}" is not running; the message is queued for its next start.`,

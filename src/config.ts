@@ -41,6 +41,15 @@ export interface Config {
   maxHeld: number
   /** How long to wait for a peer host's receipt, in milliseconds. */
   deliveryTimeoutMs: number
+  /**
+   * Whether to record collaboration counts for `npm run report`.
+   *
+   * Counts are local, aggregate, and contain no message content — but recording
+   * anything at all should be the operator's choice, so it is a switch.
+   */
+  metrics: boolean
+  /** How often buffered counts are flushed to disk, in milliseconds. */
+  metricsFlushMs: number
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -92,4 +101,11 @@ export const Config: Schema<Config> = Schema.object({
     .min(100)
     .default(5_000)
     .description("How long to wait for a peer host's receipt."),
+  metrics: Schema.boolean()
+    .default(true)
+    .description('Record collaboration counts locally, so `npm run report` can tell you what this cost and caught. No message content is stored.'),
+  metricsFlushMs: Schema.number()
+    .min(1_000)
+    .default(30_000)
+    .description('How often buffered counts are flushed to disk.'),
 })

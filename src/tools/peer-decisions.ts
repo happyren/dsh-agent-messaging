@@ -18,7 +18,7 @@ import {
   renderDecisions,
 } from '../domain/decision.ts'
 import { toEvidence } from '../domain/evidence.ts'
-import type { Clock, IdFactory } from '../ports/index.ts'
+import { noMetrics, type Clock, type IdFactory, type MetricsSink } from '../ports/index.ts'
 import { requireCallerSessionId } from './caller.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
 
@@ -49,6 +49,7 @@ export function createPeerDecideTool(
   identify: SenderIdentityResolver,
   clock: Clock,
   ids: IdFactory,
+  metrics: MetricsSink = noMetrics,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_decide',
@@ -124,6 +125,7 @@ export function createPeerDecideTool(
             : { about: { resource: args.about, scope: (args.about_scope ?? 'path') as ClaimScope } }),
         })
         await decisions.append(decision)
+        metrics.record('decision-recorded')
         return { status: 'recorded', id: decision.id }
       } catch (error) {
         return { status: 'failed', id: '', detail: explainSendFailure(error) }

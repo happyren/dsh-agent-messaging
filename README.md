@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/happyren/dsh-agent-messaging/releases/tag/v0.0.1"><img src="https://img.shields.io/github/v/release/happyren/dsh-agent-messaging?color=5B7CFF&label=release" alt="Release"></a>
+  <a href="https://github.com/happyren/dsh-agent-messaging/releases/latest"><img src="https://img.shields.io/github/v/release/happyren/dsh-agent-messaging?color=5B7CFF&label=release" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-5B7CFF" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-topic-5B7CFF" alt="dsh-plugin topic"></a>
 </p>
@@ -310,6 +310,41 @@ Three properties worth being precise about, because the setting is easy to over-
 
 For work that should stay under human control, prefer `inbound: hold` — messages
 wait, and `peer_inbox` releases them when you say so.
+
+## Is it paying for itself?
+
+Every feature here is justified by someone else's measured failure rates. None is
+justified by *yours* — so the plugin counts what it cost and what it caught:
+
+```bash
+npm run report            # all recorded activity
+npm run report -- --days 7
+```
+
+```
+COST — turns this plugin caused a session to spend
+  messages delivered              12
+  dropped by loop control          2
+CAUGHT — what would otherwise have gone wrong
+  collisions avoided               3   (a peer already held the resource)
+  false claims caught              1   (verification refuted them)
+  deadlocks detected               1
+
+12 receiver turns spent, 5 problems caught.
+```
+
+Deliberately framed as **cost versus catch**, not usage counters: "42 messages
+sent" says nothing, while "42 receiver turns spent, 6 collisions avoided" is a
+judgement you can actually make. Counts are local and aggregate — **no message
+content is stored** — and `metrics: false` turns recording off entirely.
+
+This is a command rather than an eleventh `peer_*` tool on purpose. The audience
+is you, deciding whether the plugin earns its turns; putting it in front of the
+model would take attention from the ten tools that do the work.
+
+The report states its own limit at the bottom, and means it: a caught collision
+is a real save, but these counts cannot tell you whether the turns spent were
+worth it.
 
 ## How it reaches another process
 

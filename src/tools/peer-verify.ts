@@ -18,6 +18,7 @@ import {
   type Evidence,
   type Verdict,
 } from '../domain/verification.ts'
+import { noMetrics, type MetricsSink } from '../ports/index.ts'
 import { requireCallerSessionId } from './caller.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
 
@@ -81,6 +82,7 @@ const OUTPUT_SCHEMA = {
 export function createPeerVerifyTool(
   sender: MessageSender,
   identify: SenderIdentityResolver,
+  metrics: MetricsSink = noMetrics,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_verify',
@@ -138,6 +140,7 @@ export function createPeerVerifyTool(
           mode: args.urgent === true ? 'steer' : 'followup',
           ...(exec.signal === undefined ? {} : { signal: exec.signal }),
         })
+        metrics.record('verification-sent')
         return {
           status: outcome.receipt.status,
           to: outcome.peer.name,
@@ -160,6 +163,7 @@ export function createPeerVerifyTool(
 export function createPeerVerifyReplyTool(
   sender: MessageSender,
   identify: SenderIdentityResolver,
+  metrics: MetricsSink = noMetrics,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_verify_reply',
@@ -210,6 +214,15 @@ export function createPeerVerifyReplyTool(
           args.verdict as Verdict,
           args.rationale,
           toEvidence(args.evidence),
+        )
+        // A refutation is the outcome worth counting: it is a false premise
+        // caught before the asker acted on it.
+        metrics.record(
+          verdict.verdict === 'refuted'
+            ? 'verification-refuted'
+            : verdict.verdict === 'confirmed'
+              ? 'verification-confirmed'
+              : 'verification-unsettled',
         )
         const self = await identify(selfSessionId, exec.signal)
         const outcome = await sender.send(self, {

@@ -11,6 +11,7 @@ import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { TaskStateStore } from '../adapters/task-states.ts'
 import { explainSendFailure } from '../app/send-message.ts'
 import { createTaskState, findWaitCycle, TASK_PHASES, type TaskPhase } from '../domain/task-state.ts'
+import { noMetrics, type MetricsSink } from '../ports/index.ts'
 import { requireCallerSessionId } from './caller.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
 
@@ -28,6 +29,7 @@ export function createPeerStatusTool(
   states: TaskStateStore,
   identify: SenderIdentityResolver,
   resolveSessionId: SessionIdResolver,
+  metrics: MetricsSink = noMetrics,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_status',
@@ -120,6 +122,7 @@ export function createPeerStatusTool(
         await states.publish(state)
 
         const cycle = findWaitCycle([...(await states.readAll())], selfSessionId)
+        if (cycle.length > 0) metrics.record('deadlock-detected')
         return {
           status: 'published',
           phase,

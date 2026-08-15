@@ -185,7 +185,7 @@ Worth stating the known gap: these protocols still cannot express governance
 constraints such as authority scope ([governance analysis][governance]) — which
 is precisely what `peerAuthority` exists to keep outside the wire.
 
-### v0.6.0 — Collaboration accounting
+### v0.4.0 — Collaboration accounting  ✅ shipped
 
 Turns caused by inbound messages, how many were acted on, duplicate work avoided.
 

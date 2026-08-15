@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-messaging",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Cross-session agent-to-agent messaging for DeepSeek Harness: address another session by name and deliver a message into its inbox.",
   "keywords": [
     "dsh",
@@ -35,7 +35,8 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts"
   ],
   "dsh": {
     "bundle": {
@@ -51,7 +52,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run test && npm run build",
+    "report": "node scripts/report.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.0",

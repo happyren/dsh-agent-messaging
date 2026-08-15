@@ -16,6 +16,7 @@ import { MessageSender, type SenderIdentity } from './app/send-message.ts'
 import { AgentInboxSink } from './adapters/agent-sink.ts'
 import { CardStore } from './adapters/cards.ts'
 import { ClaimStore } from './adapters/claims.ts'
+import { MetricsRecorder } from './adapters/metrics.ts'
 import { DecisionStore } from './adapters/decisions.ts'
 import { TaskStateStore } from './adapters/task-states.ts'
 import { SessionQueryPeerDirectory } from './adapters/directory.ts'
@@ -27,6 +28,7 @@ import { InboxClient } from './adapters/transport/inbox-client.ts'
 import { InboxServer } from './adapters/transport/inbox-server.ts'
 import { RoutingTransport } from './adapters/transport/routing-transport.ts'
 import { LoopGuard } from './domain/policy.ts'
+import { noMetrics, type MetricsSink } from './ports/index.ts'
 import { PLUGIN_NAME } from './plugin-name.ts'
 import { createPeerCardTool } from './tools/peer-card.ts'
 import { createPeerClaimTool } from './tools/peer-claim.ts'
@@ -64,6 +66,11 @@ export function apply(ctx: Context, config: Config): void {
   const socketPath = socketPathFor(hostId)
   const logger = ctx.logger(PLUGIN_NAME)
 
+  const recorder = config.metrics
+    ? new MetricsRecorder({ stateRoot, hostId, logger, flushMs: config.metricsFlushMs })
+    : undefined
+  const metrics: MetricsSink = recorder ?? noMetrics
+
   const presence = new PresenceStore({ stateRoot, hostId, socketPath, logger })
   const spool = new FileOutboxSpool({
     stateRoot,
@@ -85,6 +92,7 @@ export function apply(ctx: Context, config: Config): void {
     sink,
     clock: systemClock,
     maxHeld: config.maxHeld,
+    metrics,
   })
 
   const directory = new SessionQueryPeerDirectory({
@@ -100,6 +108,7 @@ export function apply(ctx: Context, config: Config): void {
     client: new InboxClient({ timeoutMs: config.deliveryTimeoutMs }),
     spool,
     spoolOffline: config.spoolOffline,
+    metrics,
   })
 
   const sender = new MessageSender({
@@ -112,6 +121,7 @@ export function apply(ctx: Context, config: Config): void {
   const claims = new WorkClaims({
     repository: new ClaimStore({ stateRoot, logger }),
     clock: systemClock,
+    metrics,
   })
 
   const cards = new CardStore({ stateRoot, logger })
@@ -149,11 +159,11 @@ export function apply(ctx: Context, config: Config): void {
       ctx.tools.register(createPeerSendTool(sender, identify)),
       ctx.tools.register(createPeerInboxTool(inbound)),
       ctx.tools.register(createPeerClaimTool(claims, identify)),
-      ctx.tools.register(createPeerVerifyTool(sender, identify)),
-      ctx.tools.register(createPeerVerifyReplyTool(sender, identify)),
+      ctx.tools.register(createPeerVerifyTool(sender, identify, metrics)),
+      ctx.tools.register(createPeerVerifyReplyTool(sender, identify, metrics)),
       ctx.tools.register(createPeerCardTool(cards)),
-      ctx.tools.register(createPeerStatusTool(taskStates, identify, resolveSessionId)),
-      ctx.tools.register(createPeerDecideTool(decisions, identify, systemClock, uuidIdFactory)),
+      ctx.tools.register(createPeerStatusTool(taskStates, identify, resolveSessionId, metrics)),
+      ctx.tools.register(createPeerDecideTool(decisions, identify, systemClock, uuidIdFactory, metrics)),
       ctx.tools.register(createPeerDecisionsTool(decisions)),
     ]
     return () => {
@@ -233,6 +243,7 @@ export function apply(ctx: Context, config: Config): void {
     return () => {
       inbound.clear()
       void (async () => {
+        await recorder?.close().catch(() => undefined)
         await presence.withdraw().catch(() => undefined)
         if (started) await server.close().catch(() => undefined)
       })()
