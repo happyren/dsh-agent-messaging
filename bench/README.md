@@ -93,25 +93,64 @@ problem for the plugin to solve rather than a problem for the benchmark to avoid
 Use a workspace you keep for the benchmark and nothing else, or point `DSH_HOME`
 at a directory of its own.
 
-## What the first full matrix found
+## Results
 
-Two of five scenarios were broken, and the baseline is what exposed them.
+DeepSeek-V4-Flash, reasoning effort high, one run per arm per scenario,
+2026-08-15.
 
-`collision` and `mutual-wait` both **passed** uncoordinated — which by the rule
-above means they measured nothing. The cause was in the runner, not the
-scenarios: prompts were dispatched one at a time, each waiting for the previous
-session to finish. A lost update and a mutual wait only exist while two sessions
-are live at once. Run them in sequence and the second session simply reads what
-the first wrote, and neither can wait for a peer that has not started.
+| scenario | baseline | plugin |
+|---|---|---|
+| `stale-contract` | fail · 2t | **pass** · 4t |
+| `collision` | n/r · 2t | n/r · 3t |
+| `false-belief` | fail · 2t | fail · 5t |
+| `mutual-wait` | n/r · 2t | n/r · 8t |
+| `stale-decision` | fail · 2t | **pass** · 2t |
+| **passed** | **0/3** | **2/3** |
+| **turns spent** | 10 | 22 |
+| **… on scoring scenarios** | 6 | 11 |
+| **turns per pass** | — | 5.5 |
 
-Fixed by splitting *submitting* a prompt from *waiting* for it: submission stays
-sequential, because that is what claims a blank session, but a scenario marked
-`concurrent: true` moves straight to the next session instead of waiting. Those
-two are re-run; the other three were unaffected and were not.
+Coordination turned 0 of 3 into 2 of 3, at roughly double the turns. That is the
+claim this project makes, measured against a control for the first time, and it
+is one run — an anecdote with a table around it, not a result.
 
-Worth stating plainly: a benchmark author's own scenarios are the first thing a
-control catches, and both of these looked completely reasonable until a run said
-otherwise.
+**The `false-belief` failure is the one worth reading.** Coordination worked: the
+peer reviewed the file, corrected the false premise, and the client recorded a
+superseding decision. Then it removed the field anyway, reasoning that since
+`createCharge` ignores `currency`, dropping it is behaviour-preserving. The
+oracle scores the world, so it fails — the repository ended exactly where the
+false premise pointed — but it is a different failure from the baseline's, which
+dropped the field *because* it believed the claim. Verification changed the
+session's beliefs and not its actions.
+
+## Two scenarios that did not reproduce
+
+`collision` and `mutual-wait` passed uncoordinated, which by the rule above means
+they score for nobody. They are marked `n/r`, kept in the table, and excluded
+from the totals.
+
+The first time, that was a runner bug: prompts were dispatched one at a time, so
+the sessions never overlapped, and neither failure can occur without overlap.
+That is fixed — submission stays sequential because it is what claims a blank
+session, but a scenario marked `concurrent: true` no longer waits.
+
+Re-run with real overlap, both passed again, for two more interesting reasons:
+
+- **`collision`** — DSH's editor patches by string replacement, re-reading the
+  file at write time, so the second write lands on top of the first. A classic
+  lost update is structurally prevented. Step repetition is still MAST's largest
+  failure mode; it simply cannot take this shape here. In a patch-based harness
+  it shows up as *duplicated effort* — two sessions doing the same work and
+  paying twice — which is a cost failure, and needs a scenario built around turns
+  rather than bytes.
+- **`mutual-wait`** — told not to guess a value another session owns, these
+  models do the part they can and document what is missing rather than blocking.
+  Both moved even with real overlap and an explicit instruction. A deadlock this
+  benchmark could measure needs a dependency a session genuinely cannot work
+  around, not one it has merely been told not to.
+
+Neither is dressed up as a pass. A benchmark whose author quietly counts free
+passes is measuring its own suite length.
 
 ## Known limits
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-messaging",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Cross-session agent-to-agent messaging for DeepSeek Harness: claims, verification and a decision ledger, so two agent sessions don't repeat, contradict or deadlock each other.",
   "keywords": [
     "dsh",

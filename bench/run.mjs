@@ -382,6 +382,7 @@ for (const scenario of chosen) {
   const total = Object.values(driven.turns).reduce((sum, count) => sum + count, 0)
   runs.push({
     id: scenario.id,
+    ...(scenario.reproduces === false ? { reproduces: false } : {}),
     ...result,
     turns: total,
     perSession: driven.turns,

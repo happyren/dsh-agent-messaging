@@ -129,6 +129,26 @@ describe('scoring', () => {
     { id: 'c', verdict: 'void', why: '', turns: 3 },
   ]
 
+  it('scores for nobody when a scenario did not reproduce its failure', () => {
+    // A control that passes uncoordinated is measuring nothing. Counting it
+    // would inflate both arms equally and hide that the comparison rests on
+    // fewer scenarios than the table appears to show.
+    const withFree = [...runs, { id: 'd', verdict: 'pass' as const, why: '', turns: 8, reproduces: false }]
+    const summary = summarize(withFree)
+    expect(summary.passed).toBe(1)
+    expect(summary.scored).toBe(2)
+    expect(summary.notReproducing).toBe(1)
+  })
+
+  it('still charges the turns a non-reproducing scenario cost', () => {
+    const withFree = [...runs, { id: 'd', verdict: 'pass' as const, why: '', turns: 8, reproduces: false }]
+    const summary = summarize(withFree)
+    expect(summary.turns).toBe(17)
+    // …but not against the ratio: those turns bought nobody a result.
+    expect(summary.scoredTurns).toBe(6)
+    expect(turnsPerPass(summary)).toBe(6)
+  })
+
   it('counts a void scenario as measured by nobody', () => {
     const summary = summarize(runs)
     expect(summary).toMatchObject({ scenarios: 3, scored: 2, passed: 1, failed: 1, void: 1 })
@@ -140,8 +160,11 @@ describe('scoring', () => {
     expect(summarize(runs).turns).toBe(9)
   })
 
-  it('reports what one correct outcome cost', () => {
-    expect(turnsPerPass(summarize(runs))).toBe(9)
+  it('reports what one correct outcome cost, charged against scoring scenarios', () => {
+    // 4 + 2 turns across the two scenarios that scored, over one pass. The
+    // void scenario's 3 turns are real cost and appear in `turns`, but they
+    // bought nobody a result, so they do not price one.
+    expect(turnsPerPass(summarize(runs))).toBe(6)
     expect(turnsPerPass(summarize([{ id: 'a', verdict: 'fail', why: '', turns: 5 }]))).toBeNull()
   })
 
