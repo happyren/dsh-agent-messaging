@@ -65,6 +65,33 @@ describe('resolvePeer', () => {
     expect(resolvePeer(peers, 'session-b').name).toBe('payments-ui')
   })
 
+  it('resolves the alias a session published about itself', () => {
+    // The address a peer reads off a capability card is the alias, not the
+    // name folded from a title — a session that publishes one must be
+    // reachable by it, or every peer that read its card addresses a stranger.
+    const withAlias = [...peers, peer({ sessionId: 'session-d', name: 'call-peer-card-2b91', alias: 'receiver' })]
+    expect(resolvePeer(withAlias, 'receiver').sessionId).toBe('session-d')
+    expect(resolvePeer(withAlias, 'Receiver').sessionId).toBe('session-d')
+  })
+
+  it('lets a published alias outrank a name derived from someone else’s title', () => {
+    // A retitle moves a derived name; an alias is chosen and stays put, so the
+    // deliberate address wins over the incidental one.
+    const contested = [
+      peer({ sessionId: 'session-d', name: 'receiver', title: 'Receiver notes' }),
+      peer({ sessionId: 'session-e', name: 'inbox-7f21', alias: 'receiver' }),
+    ]
+    expect(resolvePeer(contested, 'receiver').sessionId).toBe('session-e')
+  })
+
+  it('reports two sessions claiming one alias rather than picking one', () => {
+    const clashing = [
+      peer({ sessionId: 'session-d', name: 'one', alias: 'receiver' }),
+      peer({ sessionId: 'session-e', name: 'two', alias: 'receiver' }),
+    ]
+    expect(() => resolvePeer(clashing, 'receiver')).toThrow(/matches 2 sessions/)
+  })
+
   it('prefers an exact name over a substring of another name', () => {
     // "payments" is also a prefix of "payments-ui"; the exact tier must win.
     expect(resolvePeer(peers, 'payments').sessionId).toBe('session-a')

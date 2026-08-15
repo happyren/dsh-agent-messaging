@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { createEnvelope, type Envelope } from '../src/domain/envelope.ts'
-import { renderInbound, summarizeInbound } from '../src/domain/render.ts'
+import { renderInbound } from '../src/domain/render.ts'
+import { readPeerBody } from '../src/client/peer-message.ts'
 
 function envelope(body: string, extra: Partial<Envelope> = {}): Envelope {
   return createEnvelope({
@@ -58,25 +59,10 @@ describe('renderInbound', () => {
   })
 
   it('keeps the original text recoverable despite escaping', () => {
+    // The transcript card reads the body back out of exactly this framing, so
+    // the two are pinned together here: a change to either side that the other
+    // does not follow fails this test rather than silently blanking a card.
     const body = 'compare <a> and <b>'
-    const text = renderInbound(envelope(body))
-    const open = text.indexOf('<peer-message>') + '<peer-message>'.length
-    const close = text.indexOf('</peer-message>')
-    const parsed = JSON.parse(text.slice(open, close).trim()) as { body: string }
-    expect(parsed.body).toBe(body)
-  })
-})
-
-describe('summarizeInbound', () => {
-  it('collapses whitespace and names the sender', () => {
-    expect(summarizeInbound(envelope('line one\n\nline two'), 120)).toBe(
-      'Message from alpha: line one line two',
-    )
-  })
-
-  it('respects the bound', () => {
-    const summary = summarizeInbound(envelope('x'.repeat(500)), 120)
-    expect(summary).toHaveLength(120)
-    expect(summary.endsWith('…')).toBe(true)
+    expect(readPeerBody(renderInbound(envelope(body)))).toBe(body)
   })
 })

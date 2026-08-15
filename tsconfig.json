@@ -21,5 +21,9 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  // The browser half is checked separately, against the DOM and the JSX runtime
+  // rather than Node (tsconfig.client.json). Its pure modules still reach this
+  // program through the tests that import them, so nothing goes unchecked.
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["src/client/**"]
 }

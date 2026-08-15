@@ -234,24 +234,45 @@ The accounting in `v0.4.0` is what should decide whether either is worth
 building: run the plugin on real work, read `npm run report`, and let the numbers
 argue. That is the point of having measured anything at all.
 
-## Known limit: custom rendering
+## The transcript card (v0.10.0)
 
-Tool calls declare `presentCall`/`presentResult` — the harness's documented
-presentation vocabulary, used by first-party tools — so a card can carry the
-verdict, the refusal, or the deadlock in its title instead of a bare
-`peer_claim · api/charges.ts` row.
+An arriving peer message used to render as a `Context injection` row — accurate,
+but indistinguishable from a skill catalog or a reconciled instruction file, and
+attributed to an opaque session id. A reader could not tell, without expanding
+anything, that another agent had spoken.
 
-**Verified as not yet visible.** Against the `rc` build these were developed on,
-the Web UI renders the generic row regardless, and a presenter title does not
-appear in either the row or the detail panel. The declarations are correct
-against the published types and cost nothing to carry, so they stay — but nobody
-should read this as a UI improvement until a harness build renders them.
+The plugin now ships a **browser half**: a Conversation Node that recognizes its
+own messages in the durable log, and a renderer registered against the harness's
+keyed `conversation.chat.node` slot. The card names the sender, says how the
+message arrived (`interrupted this step` / `next turn` / `delivered quietly`),
+says what the receiving session was told it may do about it, and shows the
+message itself rather than the framing around it.
 
-Genuinely custom rendering — an inbound peer message as a real card rather than a
-`Context injection` row — needs a **client bundle**: a Conversation Node that
-folds the events, a keyed renderer registered against `conversation.chat.node`,
-CSS modules, and the client/host tsconfig split. That is a substantially larger
-piece of work than anything in this roadmap, and it is not started.
+**Two rows, deliberately.** The harness's own injected-context row stays directly
+beneath the card, because the harness's projection claims that event too and no
+plugin can suppress it. That turns out to be the right outcome rather than a
+compromise: the card is the human-facing presentation, and the row beneath it
+still holds the exact bytes the model read — untrusted-content notice and all.
+The card never claims to be that text, and says so when it cannot parse it.
+
+**A custom durable event was the design that did not survive contact.** Emitting
+one would have given the card a row of its own with nothing beside it. But a
+session log containing an event type outside `KNOWN_SESSION_EVENT_TYPES` is
+*refused on reload* unless the envelope carries an `ignorable` marker, and
+`Session.append` offers no way to set one — the harness's own comment records
+that a registration surface for downstream plugin events is deferred until such
+a consumer exists. Shipping it would have made a user's session unopenable. The
+card is therefore derived from the `user/message` event the harness already
+writes, and the plugin adds nothing to the log.
+
+**Still not visible: tool presentation.** Tool calls declare
+`presentCall`/`presentResult` — the harness's documented presentation vocabulary
+— so a card could carry the verdict, the refusal, or the deadlock in its title
+instead of a bare `peer_claim · api/charges.ts` row. Against the `rc` builds this
+was developed on, the Web UI renders the generic row regardless; re-checked at
+`v0.10.0` and still true. The declarations are correct against the published
+types and cost nothing to carry, so they stay — but nobody should read them as a
+UI improvement until a harness build renders them.
 
 ## Deliberately not building
 

@@ -97,17 +97,3 @@ export function renderInbound(envelope: Envelope, authority: PeerAuthority = 'in
     `To answer, call peer_send with to: "${envelope.from.sessionId}" and reply_to: "${envelope.id}".`,
   ].join('\n')
 }
-
-/**
- * One-line account of an arriving message, for a collapsed transcript row.
- *
- * Bounded because the harness caps a `notice` summary; the body is caller text
- * with no length of its own.
- * @param envelope - the admitted message.
- * @param maxChars - the harness bound to respect.
- * @returns the ellipsized summary.
- */
-export function summarizeInbound(envelope: Envelope, maxChars: number): string {
-  const summary = `Message from ${envelope.from.name}: ${envelope.body.replace(/\s+/g, ' ')}`
-  return summary.length <= maxChars ? summary : `${summary.slice(0, Math.max(0, maxChars - 1))}…`
-}

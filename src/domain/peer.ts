@@ -24,6 +24,14 @@ export interface PeerDescriptor {
   readonly sessionId: string
   /** Unique, human-usable address derived from title, directory, or id. */
   readonly name: string
+  /**
+   * The handle this session published about itself on its capability card.
+   *
+   * Unlike {@link PeerDescriptor.name} it is chosen rather than derived, so it
+   * survives a retitle — which is exactly why a peer that read a card repeats
+   * the alias, and why addressing has to accept it.
+   */
+  readonly alias?: string
   /** The session's latest folded title, when it has one. */
   readonly title?: string
   readonly cwd?: string
@@ -146,6 +154,9 @@ export function resolvePeer(peers: readonly PeerDescriptor[], address: string): 
 
   const tiers: readonly ((peer: PeerDescriptor) => boolean)[] = [
     (peer) => peer.sessionId === query,
+    // A published alias outranks a derived name: it is the address the session
+    // asked to be called by, and the one a peer reads off its card.
+    (peer) => peer.alias === lowered,
     (peer) => peer.name.toLowerCase() === lowered,
     (peer) => peer.name.toLowerCase().includes(lowered),
     (peer) => peer.sessionId.toLowerCase().includes(lowered),
