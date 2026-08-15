@@ -143,6 +143,10 @@ export function renderRequest(request: VerificationRequest): string {
   const lines = [
     'VERIFICATION REQUEST — a peer session is asking you to check a claim, not to agree with it.',
     '',
+    'Answer it by calling the peer_verify_reply tool. Do NOT answer with peer_send:',
+    'peer_verify_reply carries the typed verdict the asker is waiting on, and a plain',
+    'message does not.',
+    '',
     `Claim: ${request.claim}`,
   ]
 
@@ -158,8 +162,9 @@ export function renderRequest(request: VerificationRequest): string {
   lines.push(
     '',
     'Go and look before answering; do not take the claim on trust, and do not assume the',
-    'sender checked carefully. Then reply with peer_verify_reply carrying one of:',
-    `  ${VERDICTS.join(', ')}`,
+    'sender checked carefully.',
+    '',
+    `Then call peer_verify_reply with verdict = one of: ${VERDICTS.join(', ')}`,
     'and a rationale saying what you actually examined.',
   )
   return lines.join('\n')
