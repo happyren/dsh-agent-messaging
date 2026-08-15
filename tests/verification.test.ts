@@ -81,6 +81,15 @@ describe('renderRequest', () => {
     expect(text).toContain('peer_verify_reply')
   })
 
+  it('names the reply tool before the claim, and rules out answering with peer_send', () => {
+    // Live testing showed a verifier checking the claim properly and then
+    // answering with peer_send, losing the typed verdict. The instruction has to
+    // arrive before the reader is absorbed in the claim itself.
+    const text = renderRequest(createRequest('some claim'))
+    expect(text.indexOf('peer_verify_reply')).toBeLessThan(text.indexOf('some claim'))
+    expect(text).toMatch(/Do NOT answer with peer_send/)
+  })
+
   it('omits the evidence section when there is none', () => {
     expect(renderRequest(createRequest('claim'))).not.toContain('Where to look')
   })

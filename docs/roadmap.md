@@ -93,6 +93,22 @@ second, and the roadmap should not drift back into the first.
 Ordered by impact-significance: the failure mass each item removes, weighted by
 the evidence behind it.
 
+Versioning is [semantic](https://semver.org): a new tool is a feature and takes a
+minor bump, a behaviour fix takes a patch. The `0.0.x` line below `0.1.0` is
+pre-correction history and is left as it shipped.
+
+### Verified in a live host
+
+`v0.0.3` and `v0.0.4` were exercised against two real sessions in one `dsh web`
+host, not only against tests. Both behaved as designed — a claim on `api/` was
+refused because a peer held `api/charges.ts` beneath it, and a verifier answered a
+false claim by reading the file and refuting it with line references.
+
+That run also produced the fix in `v0.0.5`: the verifier checked properly, then
+answered with `peer_send` instead of `peer_verify_reply`, losing the typed
+verdict. Tool wording is only testable against real models, which is why each
+item ships with a live pass rather than tests alone.
+
 ### v0.0.3 — Work claims  ✅ shipped
 
 Advisory claims on a path or topic, with a TTL, visible to every peer.
@@ -116,7 +132,7 @@ qualitatively different from self-verification — which is known to fail
 ([Huang et al.][self-correct]) — because the verifier holds different context and
 did not produce the artefact.
 
-### v0.0.5 — Capability and ownership cards
+### v0.1.0 — Capability and ownership cards
 
 Each session declares what it owns and what it is for; peers read it before
 addressing it.
@@ -126,7 +142,7 @@ Attacks **FM-1.2 disobey role specification** and **FM-2.3 task derailment**
 Shaped after [A2A][a2a] Agent Cards, so the same declaration can later serve
 cross-vendor discovery.
 
-### v0.0.6 — Task-state signalling
+### v0.2.0 — Task-state signalling
 
 Report *task* state — working, blocked-on-peer, done, abandoned — rather than
 only the process state (`idle`/`running`) the agent registry exposes.
@@ -136,7 +152,7 @@ termination (6.2%)**. This is common ground in Klein's sense: a teammate that
 cannot signal completion or blockage cannot be coordinated with
 ([Klein et al.][klein]).
 
-### v0.0.7 — Shared decision ledger
+### v0.3.0 — Shared decision ledger
 
 An append-only record of what was decided, by whom, on what evidence, readable
 by any session at any time.
@@ -147,7 +163,7 @@ reset**. Messages are ephemeral; common ground has to outlive them. Follows the
 who knows what rather than replicating everyone's full memory
 ([MATM][matm], [memory survey][mem-survey]).
 
-### v0.0.8 — Groups and topology control
+### v0.4.0 — Groups and topology control
 
 Named channels with an explicit shape: star through a lead, or mesh.
 
@@ -155,7 +171,7 @@ Communication topology measurably changes both efficiency and quality, and
 denser is not automatically better ([topology study][topology]). Making the shape
 explicit beats an implicit all-to-all that degrades as sessions multiply.
 
-### v0.0.9 — A2A bridge
+### v0.5.0 — A2A bridge
 
 Speak [Agent2Agent][a2a] so DSH sessions can reach agents outside DSH.
 
@@ -169,7 +185,7 @@ Worth stating the known gap: these protocols still cannot express governance
 constraints such as authority scope ([governance analysis][governance]) — which
 is precisely what `peerAuthority` exists to keep outside the wire.
 
-### v0.0.10 — Collaboration accounting
+### v0.6.0 — Collaboration accounting
 
 Turns caused by inbound messages, how many were acted on, duplicate work avoided.
 
