@@ -51,6 +51,15 @@ export interface Config {
   /** How often buffered counts are flushed to disk, in milliseconds. */
   metricsFlushMs: number
   /**
+   * Whether to contribute the `peer-coordination` skill.
+   *
+   * The skill is what turns a set of tools into a practice — when a claim is
+   * worth taking, when a belief is worth checking, when silence is the right
+   * reply. A deployment that supplies its own coordination guidance can turn it
+   * off rather than argue with it.
+   */
+  skill: boolean
+  /**
    * Shape of each named group, keyed by group name without its `#`.
    *
    * Topology is a deployment decision rather than something that emerges from
@@ -138,6 +147,9 @@ export const Config: Schema<Config> = Schema.object({
     .min(100)
     .default(5_000)
     .description("How long to wait for a peer host's receipt."),
+  skill: Schema.boolean()
+    .default(true)
+    .description('Contribute the peer-coordination skill, which teaches when coordinating with another session is worth a turn.'),
   metrics: Schema.boolean()
     .default(true)
     .description('Record collaboration counts locally, so `npm run report` can tell you what this cost and caught. No message content is stored.'),

@@ -5,6 +5,8 @@
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 
 import type { CardStore } from '../adapters/cards.ts'
+import type { WorkspaceFacts } from '../domain/derived-card.ts'
+import { deriveCard } from '../domain/derived-card.ts'
 import type { TaskStateStore } from '../adapters/task-states.ts'
 import type { WorkClaims } from '../app/claim-work.ts'
 import type { MessageSender } from '../app/send-message.ts'
@@ -41,6 +43,7 @@ export function createPeerListTool(
   claims: WorkClaims,
   cards: CardStore,
   states: TaskStateStore,
+  describe?: (cwd: string) => Promise<Omit<WorkspaceFacts, 'sessionId'>>,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_list',
@@ -113,6 +116,26 @@ export function createPeerListTool(
         states.readAll(),
       ])
       const cardBySession = new Map(published.map((card) => [card.sessionId, card]))
+
+      // A session is useful to its peers before it declares anything: where a
+      // card was never published, the workspace is read for the honest part of
+      // one, marked as inferred so nobody mistakes it for a statement.
+      if (describe !== undefined) {
+        const now = Date.now()
+        await Promise.all(
+          peers
+            .filter((peer) => !cardBySession.has(peer.sessionId) && peer.cwd !== undefined)
+            .map(async (peer) => {
+              try {
+                const facts = await describe(peer.cwd as string)
+                const card = deriveCard({ sessionId: peer.sessionId, ...facts }, now)
+                if (card !== undefined) cardBySession.set(peer.sessionId, card)
+              } catch {
+                // A listing must survive an unreadable directory.
+              }
+            }),
+        )
+      }
       // A wait is recorded as a session id; a reader needs the address.
       const addressBySession = new Map(peers.map((peer) => [peer.sessionId, peerAddress(peer)]))
       const stateBySession = new Map(declared.map((state) => [state.sessionId, state]))

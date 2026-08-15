@@ -9,6 +9,8 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+// Loaded for its Context augmentation: the optional `skills` registry.
+import type {} from '@deepseek-ai/dsh-skill'
 
 import { WorkClaims } from './app/claim-work.ts'
 import { InboundRouter } from './app/receive-message.ts'
@@ -21,6 +23,7 @@ import { MetricsRecorder } from './adapters/metrics.ts'
 import { DecisionStore } from './adapters/decisions.ts'
 import { TaskStateStore } from './adapters/task-states.ts'
 import { SessionQueryPeerDirectory } from './adapters/directory.ts'
+import { WorkspaceReader } from './adapters/workspace.ts'
 import { PresenceStore, socketPathFor } from './adapters/presence.ts'
 import { FileOutboxSpool } from './adapters/spool.ts'
 import { createHostId, resolveStateRoot, systemClock, uuidIdFactory } from './adapters/system.ts'
@@ -33,6 +36,7 @@ import { RoutingTransport } from './adapters/transport/routing-transport.ts'
 import { LoopGuard } from './domain/policy.ts'
 import { noMetrics, type MetricsSink } from './ports/index.ts'
 import { PLUGIN_NAME } from './plugin-name.ts'
+import { SKILL_BODY, SKILL_DESCRIPTION, SKILL_NAME, SKILL_WHEN_TO_USE } from './skill.ts'
 import { createPeerCardTool } from './tools/peer-card.ts'
 import { createPeerClaimTool } from './tools/peer-claim.ts'
 import { createPeerDecideTool, createPeerDecisionsTool } from './tools/peer-decisions.ts'
@@ -115,6 +119,7 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   const cards = new CardStore({ stateRoot, logger })
+  const workspace = new WorkspaceReader()
 
   const directory = new SessionQueryPeerDirectory({
     sessionQuery: ctx.sessionQuery,
@@ -182,12 +187,31 @@ export function apply(ctx: Context, config: Config): void {
     )?.sessionId
   }
 
+  // Judgment, not capability: the tools say what is possible, the skill says
+  // when spending a peer's turn is worth it. Optional service, so a profile
+  // without the skill subsystem simply gets the tools.
+  if (config.skill) {
+    ctx.inject(['skills'], (scoped) => {
+      scoped.effect(
+        () =>
+          scoped.skills.register({
+            name: SKILL_NAME,
+            description: SKILL_DESCRIPTION,
+            whenToUse: SKILL_WHEN_TO_USE,
+            content: SKILL_BODY,
+            source: 'runtime',
+          }),
+        'agent-messaging: coordination skill',
+      )
+    })
+  }
+
   ctx.effect(() => {
     const enabled = config.capabilities
     const definitions = [
       // Addressing and delivery are the plugin; without them nothing else has a
       // point, so they are not optional.
-      createPeerListTool(sender, claims, cards, taskStates),
+      createPeerListTool(sender, claims, cards, taskStates, (cwd) => workspace.read(cwd)),
       createPeerSendTool(sender, identify, cards, config.groups, config.maxFanout),
       // Held messages only exist under the `hold` policy. Registering the tool
       // that reads them anywhere else spends model attention on a list that is

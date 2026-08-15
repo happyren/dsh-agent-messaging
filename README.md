@@ -11,7 +11,9 @@
 
 # dsh-agent-messaging
 
-Cross-session agent-to-agent messaging for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+**Cross-session verification, claims and a decision ledger for
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — so two agent
+sessions don't repeat, contradict or deadlock each other.**
 
 Two sessions you started yourself — in the Web UI, in a headless run, in separate
 worktrees, in separate `dsh` processes — cannot tell each other anything. When one
@@ -136,7 +138,7 @@ one sentence telling them not to be:
 
 **65% less traffic, identical catches.** That is what the accounting is for: it
 made a prompt-level regression visible, and then showed the fix worked. Run it on
-your own work with `npm run report`.
+your own work with `npx dsh-agent-messaging report`.
 
 ## What it is not
 
@@ -152,33 +154,56 @@ A message is text. Never conversation history, never files.
 ## Install
 
 ```bash
+npx -p @deepseek-ai/dsh dsh plugin --profile web add dsh-agent-messaging
+```
+
+Restart the profile, then check the install from inside or outside a session:
+
+```bash
+npx dsh-agent-messaging doctor
+```
+
+```
+OK    node                v24.13.1
+OK    build               host and browser bundles present
+OK    state-root          /Users/you/.dsh/agent-messaging (writable)
+OK    presence            2 live hosts, 0 stale records
+OK    socket-permissions  owner-only (0600)
+OK    accounting          recording; run `npx dsh-agent-messaging report` to see what this cost and caught
+```
+
+It exits non-zero on anything that would stop messaging working, and every line
+that reports a problem also says what to do about it — so a session that suspects
+its own messaging is broken can run this and read the answer.
+
+**Nothing else to configure.** A session is addressable and informative from the
+moment it starts: peers see what directory it works in, and what the humans wrote
+about that directory in `AGENTS.md` or `README.md`. `peer_card` upgrades that from
+inferred to declared; it is not a prerequisite.
+
+The transcript card needs the Web UI. Everything else works headless, and without
+the browser half a message renders as the harness's ordinary context row.
+
+<details>
+<summary>Installing from git instead</summary>
+
+```bash
 npx -p @deepseek-ai/dsh dsh plugin --profile web add github:happyren/dsh-agent-messaging
 ```
 
-`dsh plugin` shells out to pnpm, so pnpm ≥10 must be on your PATH — `corepack enable pnpm`
-is enough.
-
-The package ships a self-contained `prepare` script, and pnpm blocks build scripts
-from git dependencies until you allow them. The first `add` will fail and print the
-package key; add it to the profile's `pnpm-workspace.yaml`:
+`dsh plugin` shells out to pnpm, and pnpm blocks build scripts from git
+dependencies until you allow them. The first `add` will fail and print the package
+key; add it to the profile's `pnpm-workspace.yaml`:
 
 ```yaml
 allowBuilds:
   dsh-agent-messaging: true
 ```
 
-then re-run the `add`. Pin a commit (`github:happyren/dsh-agent-messaging#<sha>`) so a
-later push cannot change what runs on your machine.
+then re-run the `add`. Pin a commit (`github:happyren/dsh-agent-messaging#<sha>`) so
+a later push cannot change what runs on your machine.
 
-Restart the profile afterwards, and verify the layer loaded:
-
-```bash
-dsh --profile web --dump-config
-```
-
-You should see a `# == dsh-agent-messaging` layer. The transcript card needs the
-Web UI; everything else works headless, and without the browser half a message
-renders as the harness's ordinary context row.
+</details>
 
 ## Tools
 
@@ -271,6 +296,13 @@ not its display name — display names are folded from session titles and move.
 
 Declare what this session is for and what it owns, so peers route work correctly
 instead of guessing from a folded title.
+
+**This is an upgrade, not a prerequisite.** A session that never calls it is still
+listed with what can be read off the workspace — the directory it works in, and
+the headline of that directory's `AGENTS.md` or `README.md` — marked `inferred
+from the workspace, not declared` so nobody mistakes an inference for a statement.
+Models do not do reliable setup, and a listing that says nothing until one makes a
+tool call is a listing that is usually empty of meaning.
 
 ```
 peer_card  alias: "payments-api"
@@ -413,6 +445,17 @@ nobody acts on a reversed decision, and `include_superseded` shows the history.
 Lists messages held for you under the `hold` policy, and releases them when your
 operator asks. Empty under the default `accept`.
 
+### The `peer-coordination` skill
+
+Tools say what is possible; the skill says what is wise. It ships with the plugin
+and teaches the judgment the tools cannot carry — claim before editing shared
+code, verify a claim you did not produce, record what was settled, say when you
+are blocked, and *stop replying when an exchange is over*.
+
+Every rule in it came out of a measured run rather than a style guide, including
+the one that [cut message traffic by 65%](#what-it-cost). Set `skill: false` if
+your deployment supplies its own coordination guidance.
+
 ## Collaboration and safety
 
 By default a peer message is **information, not instruction**. The receiving model is
@@ -462,8 +505,8 @@ Every feature here is justified by someone else's measured failure rates. None i
 justified by *yours* — so the plugin counts what it cost and what it caught:
 
 ```bash
-npm run report            # all recorded activity
-npm run report -- --days 7
+npx dsh-agent-messaging report              # all recorded activity
+npx dsh-agent-messaging report --days 7
 ```
 
 ```
@@ -657,9 +700,16 @@ being built.
 
 ## Contributing
 
-Code contributions are not being accepted, but questions, bug reports and ideas are
-welcome in [Discussions](https://github.com/happyren/dsh-agent-messaging/discussions).
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The most useful thing you can send is not a patch: it is a run where coordination
+cost more than it caught. Paste what `npx dsh-agent-messaging report` says, with
+the transcript if two sessions talked past each other. Every significant fix in
+this project so far came from watching real sessions fail, and so far all of those
+runs have been mine.
+
+Questions, ideas and design feedback belong in
+[Discussions](https://github.com/happyren/dsh-agent-messaging/discussions).
 
 ## License
 
