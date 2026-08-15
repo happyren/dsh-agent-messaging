@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-messaging",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Cross-session agent-to-agent messaging for DeepSeek Harness: address another session by name and deliver a message into its inbox.",
   "keywords": [
     "dsh",

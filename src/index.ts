@@ -175,18 +175,37 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   ctx.effect(() => {
-    const disposers = [
-      ctx.tools.register(createPeerListTool(sender, claims, cards, taskStates)),
-      ctx.tools.register(createPeerSendTool(sender, identify, cards, config.groups, config.maxFanout)),
-      ctx.tools.register(createPeerInboxTool(inbound)),
-      ctx.tools.register(createPeerClaimTool(claims, identify)),
-      ctx.tools.register(createPeerVerifyTool(sender, identify, metrics)),
-      ctx.tools.register(createPeerVerifyReplyTool(sender, identify, metrics)),
-      ctx.tools.register(createPeerCardTool(cards)),
-      ctx.tools.register(createPeerStatusTool(taskStates, identify, resolveSessionId, metrics)),
-      ctx.tools.register(createPeerDecideTool(decisions, identify, systemClock, uuidIdFactory, metrics)),
-      ctx.tools.register(createPeerDecisionsTool(decisions)),
+    const enabled = config.capabilities
+    const definitions = [
+      // Addressing and delivery are the plugin; without them nothing else has a
+      // point, so they are not optional.
+      createPeerListTool(sender, claims, cards, taskStates),
+      createPeerSendTool(sender, identify, cards, config.groups, config.maxFanout),
+      // Held messages only exist under the `hold` policy. Registering the tool
+      // that reads them anywhere else spends model attention on a list that is
+      // always empty.
+      ...(config.inbound === 'hold' ? [createPeerInboxTool(inbound)] : []),
+      ...(enabled.claims ? [createPeerClaimTool(claims, identify)] : []),
+      ...(enabled.verification
+        ? [
+            createPeerVerifyTool(sender, identify, metrics),
+            createPeerVerifyReplyTool(sender, identify, metrics),
+          ]
+        : []),
+      ...(enabled.identity
+        ? [
+            createPeerCardTool(cards),
+            createPeerStatusTool(taskStates, identify, resolveSessionId, metrics),
+          ]
+        : []),
+      ...(enabled.decisions
+        ? [
+            createPeerDecideTool(decisions, identify, systemClock, uuidIdFactory, metrics),
+            createPeerDecisionsTool(decisions),
+          ]
+        : []),
     ]
+    const disposers = definitions.map((definition) => ctx.tools.register(definition))
     return () => {
       for (const dispose of disposers) dispose()
     }

@@ -101,6 +101,26 @@ You should see a `# == dsh-agent-messaging` layer.
 
 ## Tools
 
+Nine tools register by default. That is a lot of competition for a model's
+attention, so a deployment only pays for what it uses:
+
+```yaml
+- id: agent-messaging
+  config:
+    capabilities:
+      claims: true         # peer_claim
+      verification: false  # peer_verify, peer_verify_reply
+      identity: false      # peer_card, peer_status
+      decisions: false     # peer_decide, peer_decisions
+```
+
+That leaves three: `peer_list`, `peer_send`, `peer_claim`. Addressing and delivery
+are always registered — without them nothing else has a point. Everything defaults
+**on**, so upgrading never silently removes a tool a workflow depends on.
+
+`peer_inbox` registers only under `inbound: hold`, because held messages do not
+exist otherwise and a tool that always reads an empty list is pure overhead.
+
 ### `peer_list`
 
 Sessions this one can address — name, state, title, directory. Identities only;
