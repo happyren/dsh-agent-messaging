@@ -19,6 +19,7 @@ import {
   type Verdict,
 } from '../domain/verification.ts'
 import { noMetrics, type MetricsSink } from '../ports/index.ts'
+import { presentVerifyCall, presentVerifyReplyCall } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
 
@@ -129,6 +130,7 @@ export function createPeerVerifyTool(
         },
       ],
     },
+    presentCall: (args) => presentVerifyCall(args),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       try {
@@ -207,6 +209,7 @@ export function createPeerVerifyReplyTool(
         },
       ],
     },
+    presentCall: (args) => presentVerifyReplyCall(args),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       try {

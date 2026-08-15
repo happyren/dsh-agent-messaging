@@ -19,6 +19,7 @@ import {
 } from '../domain/decision.ts'
 import { toEvidence } from '../domain/evidence.ts'
 import { noMetrics, type Clock, type IdFactory, type MetricsSink } from '../ports/index.ts'
+import { presentDecideCall, presentDecisionsCall } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
 
@@ -107,6 +108,7 @@ export function createPeerDecideTool(
         },
       ],
     },
+    presentCall: (args) => presentDecideCall(args),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       try {
@@ -179,6 +181,7 @@ export function createPeerDecisionsTool(decisions: DecisionStore): ToolDefinitio
       },
       render: (_args, value) => [{ type: 'text', text: value.rendered }],
     },
+    presentCall: (args) => presentDecisionsCall(args),
     async execute(args) {
       const all = await decisions.readAll()
       const scoped = args.about

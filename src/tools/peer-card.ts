@@ -8,6 +8,7 @@ import { explainSendFailure } from '../app/send-message.ts'
 import { createCard, summarizeCard } from '../domain/card.ts'
 import type { ClaimScope } from '../domain/claim.ts'
 import type { CardStore } from '../adapters/cards.ts'
+import { presentCardCall } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 
 /**
@@ -87,6 +88,7 @@ export function createPeerCardTool(cards: CardStore): ToolDefinition {
         },
       ],
     },
+    presentCall: (args) => presentCardCall(args),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       try {

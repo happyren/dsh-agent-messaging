@@ -8,6 +8,7 @@ import type { CardStore } from '../adapters/cards.ts'
 import { explainSendFailure, type MessageSender, type SenderIdentity } from '../app/send-message.ts'
 import type { DeliveryMode } from '../domain/envelope.ts'
 import { isGroupAddress, normalizeGroupName, type GroupShape } from '../domain/group.ts'
+import { presentSendCall, presentSendResult } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 
 /** Resolves the executing session's display name and directory at call time. */
@@ -89,6 +90,8 @@ export function createPeerSendTool(
         },
       ],
     },
+    presentCall: (args) => presentSendCall(args),
+    presentResult: (args, result) => presentSendResult(args, result),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       const self = await identify(selfSessionId, exec.signal)
