@@ -132,7 +132,7 @@ qualitatively different from self-verification — which is known to fail
 ([Huang et al.][self-correct]) — because the verifier holds different context and
 did not produce the artefact.
 
-### v0.1.0 — Capability and ownership cards
+### v0.1.0 — Capability and ownership cards  ✅ shipped
 
 Each session declares what it owns and what it is for; peers read it before
 addressing it.

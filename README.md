@@ -136,6 +136,31 @@ delivered when it next starts, within the configured age and depth bounds.
 Replies correlate through `reply_to`, and the receiver is told to answer the sender's
 session id rather than its display name, which can change when a title is refolded.
 
+### `peer_card`
+
+Declare what this session is for and what it owns, so peers route work correctly
+instead of guessing from a folded title.
+
+```
+peer_card  role: "Payments API owner. I do NOT own client code."
+           owns: [{ resource: "api/charges.ts" }, { resource: "charge validation rules", scope: "topic" }]
+           skills: ["payments-api", "validation-rules"]
+```
+
+It then appears in every peer's `peer_list`, and a session with work to route
+reads it rather than guessing.
+
+This targets **FM-1.2 disobey role specification** and **FM-2.3 task derailment
+(7.4%)**; role specification was one of only two interventions MAST measured
+directly, at **+9.4%**. Shaped after
+[A2A Agent Cards](https://en.wikipedia.org/wiki/Agent2Agent) so the same
+declaration can later serve cross-vendor discovery.
+
+Ownership here is **standing responsibility, not a reservation** — it never
+conflicts and reserves nothing. `peer_claim` is the short-lived "I am editing this
+right now" signal. Saying what you *don't* own is as useful as what you do, since
+it stops peers sending you work that isn't yours.
+
 ### `peer_verify` and `peer_verify_reply`
 
 Ask a differently-situated peer to check a claim you're about to act on.
