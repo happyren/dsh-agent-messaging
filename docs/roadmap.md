@@ -172,7 +172,7 @@ Anthropic's 15× token result is the cautionary tale: collaboration is expensive
 and it was only known to be worthwhile because it was measured
 ([writeup][anthropic]).
 
-### Not built: groups and topology control
+### v0.5.0 — Groups and topology control  ✅ shipped
 
 Named channels with an explicit shape: star through a lead, or mesh.
 
