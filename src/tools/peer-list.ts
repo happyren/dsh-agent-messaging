@@ -9,7 +9,7 @@ import type { TaskStateStore } from '../adapters/task-states.ts'
 import type { WorkClaims } from '../app/claim-work.ts'
 import type { MessageSender } from '../app/send-message.ts'
 import { summarizeCard } from '../domain/card.ts'
-import type { PeerDescriptor } from '../domain/peer.ts'
+import { peerAddress, type PeerDescriptor } from '../domain/peer.ts'
 import { summarizeTaskState } from '../domain/task-state.ts'
 import { presentListCall } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
@@ -113,6 +113,8 @@ export function createPeerListTool(
         states.readAll(),
       ])
       const cardBySession = new Map(published.map((card) => [card.sessionId, card]))
+      // A wait is recorded as a session id; a reader needs the address.
+      const addressBySession = new Map(peers.map((peer) => [peer.sessionId, peerAddress(peer)]))
       const stateBySession = new Map(declared.map((state) => [state.sessionId, state]))
 
       /** Claimed resources by holding session, so a caller sees who is on what. */
@@ -128,12 +130,14 @@ export function createPeerListTool(
         const card = cardBySession.get(peer.sessionId)
         const task = stateBySession.get(peer.sessionId)
         return {
-          name: peer.name,
+          name: peerAddress(peer),
           session_id: peer.sessionId,
           state: reachability(peer),
           ...(peer.title === undefined ? {} : { title: peer.title }),
           ...(peer.cwd === undefined ? {} : { cwd: peer.cwd }),
-          ...(task === undefined ? {} : { task: summarizeTaskState(task) }),
+          ...(task === undefined
+            ? {}
+            : { task: summarizeTaskState(task, (id) => addressBySession.get(id)) }),
           ...(card === undefined ? {} : { role: summarizeCard(card) }),
           ...(working.length === 0 ? {} : { working_on: working }),
         }

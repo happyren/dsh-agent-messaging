@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { PeerError } from '../src/domain/errors.ts'
-import { assignPeerNames, resolvePeer, type PeerDescriptor } from '../src/domain/peer.ts'
+import { assignPeerNames, peerAddress, resolvePeer, type PeerDescriptor } from '../src/domain/peer.ts'
 
 function peer(overrides: Partial<PeerDescriptor> & Pick<PeerDescriptor, 'sessionId' | 'name'>): PeerDescriptor {
   return {
@@ -63,6 +63,15 @@ describe('resolvePeer', () => {
 
   it('matches an exact session id first', () => {
     expect(resolvePeer(peers, 'session-b').name).toBe('payments-ui')
+  })
+
+  it('calls a peer by the address that resolves to it', () => {
+    // A listing, a refused claim and a delivered message all read as "go and
+    // talk to this session", so they must agree on what to call it.
+    expect(peerAddress(peer({ sessionId: 's1', name: 'ready-57a1', alias: 'payments-api' }))).toBe(
+      'payments-api',
+    )
+    expect(peerAddress(peer({ sessionId: 's1', name: 'payments' }))).toBe('payments')
   })
 
   it('resolves the alias a session published about itself', () => {

@@ -136,6 +136,20 @@ export function assignPeerNames(sources: readonly PeerNameSource[]): ReadonlyMap
 }
 
 /**
+ * The address to call one peer by.
+ *
+ * One rule, in one place, because every surface that shows a peer has to agree:
+ * a listing, a refused claim, a wait, and the attribution on a delivered message
+ * are all read as "go and talk to this session", and two vocabularies for one
+ * session is how a peer ends up addressing a stranger.
+ * @param peer - the peer to name.
+ * @returns the alias it published, or its derived display name.
+ */
+export function peerAddress(peer: Pick<PeerDescriptor, 'name' | 'alias'>): string {
+  return peer.alias ?? peer.name
+}
+
+/**
  * Resolve a user- or model-supplied address to exactly one peer.
  *
  * Matching runs most-specific first and stops at the first tier that produces

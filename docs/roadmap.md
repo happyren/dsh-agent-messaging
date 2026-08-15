@@ -274,6 +274,28 @@ was developed on, the Web UI renders the generic row regardless; re-checked at
 types and cost nothing to carry, so they stay — but nobody should read them as a
 UI improvement until a harness build renders them.
 
+## What the accounting caught first (v0.10.1)
+
+The accounting was built to answer whether collaboration pays for itself. The
+first thing it actually caught was the plugin's own cost.
+
+A five-session live run produced **20 delivered messages against 3 problems
+caught**, with 2 more dropped by loop control. The transcripts said why: once the
+work was finished, the sessions kept going — *"Noted, thanks."* → *"Anytime —
+good luck."* → *"Thanks, will keep you posted."* → *"Perfect — I'm here."* Nothing
+was wrong with any single message. Each one cost a receiver a turn.
+
+The fix was one sentence in `peer_send`'s description telling models not to send
+acknowledgements. Re-running the same scenario: **7 delivered, 0 dropped, the same
+3 problems caught.** A 65% cut in cost with no loss of value, from a change that
+touched no code path.
+
+Two things worth taking from it. First, the instrument works: a prompt-level
+regression in what collaboration costs is invisible in any transcript and obvious
+in the counts. Second, guidance that a run proves load-bearing belongs under test
+(`tests/tool-guidance.test.ts`) — a description is exactly the kind of thing an
+edit trims without noticing.
+
 ## Deliberately not building
 
 - **Debate or voting among peers.** The evidence is against it at equal budget,
