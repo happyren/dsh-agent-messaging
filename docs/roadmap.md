@@ -180,7 +180,7 @@ Communication topology measurably changes both efficiency and quality, and
 denser is not automatically better ([topology study][topology]). Making the shape
 explicit beats an implicit all-to-all that degrades as sessions multiply.
 
-### Not built: an A2A bridge
+### v0.6.0 — A2A bridge (outbound)  ✅ shipped
 
 Speak [Agent2Agent][a2a] so DSH sessions can reach agents outside DSH.
 

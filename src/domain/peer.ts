@@ -14,6 +14,8 @@ export type PeerLocation =
   | { readonly kind: 'local' }
   /** A live agent in another host process, reachable over its inbox socket. */
   | { readonly kind: 'remote'; readonly hostId: string; readonly socketPath: string }
+  /** An agent outside DSH entirely, reachable over Agent2Agent. */
+  | { readonly kind: 'a2a'; readonly alias: string }
   /** Known to the corpus but not currently hosted anywhere. */
   | { readonly kind: 'offline' }
 

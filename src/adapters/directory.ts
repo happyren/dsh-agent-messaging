@@ -11,6 +11,7 @@ import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionQueryService } from '@deepseek-ai/dsh-session-query'
 
+import type { A2AEndpoint } from '../domain/a2a.ts'
 import { assignPeerNames, type PeerDescriptor, type PeerLocation, type PeerNameSource } from '../domain/peer.ts'
 import type { Logger, PeerDirectory } from '../ports/index.ts'
 import type { PresenceStore } from './presence.ts'
@@ -23,6 +24,8 @@ export interface PeerDirectoryOptions {
   readonly logger: Logger
   /** Whether sessions created as subagent children are addressable. */
   readonly includeSubagents: boolean
+  /** External agents this deployment can reach, keyed by alias. */
+  readonly a2aEndpoints?: Record<string, A2AEndpoint>
 }
 
 /** Builds {@link PeerDescriptor}s from the harness session corpus. */
@@ -32,6 +35,7 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
   readonly #presence: PresenceStore
   readonly #logger: Logger
   readonly #includeSubagents: boolean
+  readonly #a2aEndpoints: Record<string, A2AEndpoint>
 
   constructor(options: PeerDirectoryOptions) {
     this.#sessionQuery = options.sessionQuery
@@ -39,6 +43,7 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
     this.#presence = options.presence
     this.#logger = options.logger
     this.#includeSubagents = options.includeSubagents
+    this.#a2aEndpoints = options.a2aEndpoints ?? {}
   }
 
   /**
@@ -74,7 +79,17 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
       }
     }
 
-    return visible.map((record) => {
+    // External agents are peers with no session behind them: they are always
+    // reachable in principle, and never live in the corpus sense.
+    const external: PeerDescriptor[] = Object.values(this.#a2aEndpoints).map((endpoint) => ({
+      sessionId: `a2a:${endpoint.alias}`,
+      name: endpoint.alias,
+      createdAt: 0,
+      live: true,
+      location: { kind: 'a2a', alias: endpoint.alias },
+    }))
+
+    const sessions = visible.map((record) => {
       const sessionId = record.header.id
       const localAgent = this.#agents.get(sessionId as SessionId)
       const remote = remoteBySession.get(sessionId)
@@ -99,6 +114,8 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
         location,
       } satisfies PeerDescriptor
     })
+
+    return [...sessions, ...external]
   }
 
   async #readPresence(): Promise<readonly { hostId: string; socketPath: string; sessions: readonly string[] }[]> {

@@ -12,6 +12,8 @@ import type { Envelope } from '../../domain/envelope.ts'
 import { PeerError } from '../../domain/errors.ts'
 import type { PeerDescriptor } from '../../domain/peer.ts'
 import { noMetrics, type DeliveryReceipt, type MetricsSink, type OutboxSpool, type PeerTransport } from '../../ports/index.ts'
+import type { A2AEndpoint } from '../../domain/a2a.ts'
+import type { A2AClient } from './a2a-client.ts'
 import type { InboxClient } from './inbox-client.ts'
 
 /** Construction inputs for {@link RoutingTransport}. */
@@ -21,6 +23,10 @@ export interface RoutingTransportOptions {
   readonly spool: OutboxSpool
   /** Whether a message to a non-running session is spooled or rejected. */
   readonly spoolOffline: boolean
+  /** Speaks Agent2Agent to agents outside DSH. */
+  readonly a2aClient?: A2AClient
+  /** External agents this deployment can reach, keyed by alias. */
+  readonly a2aEndpoints?: Record<string, A2AEndpoint>
   /** Where spooling is counted. Defaults to counting nothing. */
   readonly metrics?: MetricsSink
 }
@@ -32,6 +38,8 @@ export class RoutingTransport implements PeerTransport {
   readonly #spool: OutboxSpool
   readonly #spoolOffline: boolean
   readonly #metrics: MetricsSink
+  readonly #a2aClient: A2AClient | undefined
+  readonly #a2aEndpoints: Record<string, A2AEndpoint>
 
   constructor(options: RoutingTransportOptions) {
     this.#inbound = options.inbound
@@ -39,6 +47,8 @@ export class RoutingTransport implements PeerTransport {
     this.#spool = options.spool
     this.#spoolOffline = options.spoolOffline
     this.#metrics = options.metrics ?? noMetrics
+    this.#a2aClient = options.a2aClient
+    this.#a2aEndpoints = options.a2aEndpoints ?? {}
   }
 
   /**
@@ -56,6 +66,17 @@ export class RoutingTransport implements PeerTransport {
 
       case 'remote':
         return this.#client.send(peer.location.socketPath, envelope, signal)
+
+      case 'a2a': {
+        const endpoint = this.#a2aEndpoints[peer.location.alias]
+        if (!this.#a2aClient || !endpoint) {
+          throw new PeerError(
+            'peer-unreachable',
+            `External agent "${peer.location.alias}" is no longer configured.`,
+          )
+        }
+        return this.#a2aClient.send(endpoint, envelope, signal)
+      }
 
       case 'offline': {
         if (!this.#spoolOffline) {
