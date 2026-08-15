@@ -511,6 +511,22 @@ imports no framework, `src/app` holds the use cases behind the interfaces in
 `src/ports`, and `src/adapters` binds those to Cordis, the agent registry, sockets and
 disk.
 
+`tests/scenario.integration.test.ts` is the one that proves the README's actual
+claim. It runs a three-session team through a breaking contract change on the real
+stack — real stores, real sockets, real loop control, real accounting — and pins
+the exact numbers that come out:
+
+```
+3 receiver turns spent, 3 problems caught
+  collisions avoided   1   checkout stopped from duplicating a claimed file
+  false claims caught  1   a currency claim refuted before it was acted on
+  deadlocks detected   1   docs and checkout waiting on each other
+```
+
+It also pins the guarantee the admission design rests on: a `refuse` policy holds
+whether a message arrives in-process or over a socket. If a change makes
+collaboration quieter or noisier, those numbers move and the test says so.
+
 Transport, presence and spool tests run against real Unix sockets and real files rather
 than mocks. `tests/collaboration-scenario.test.ts` drives the handoff shown above end
 to end.
