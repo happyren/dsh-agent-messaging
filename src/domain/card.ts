@@ -67,6 +67,14 @@ export interface CapabilityCard {
   readonly groups: readonly string[]
   /** Unix epoch milliseconds the card was last published. */
   readonly updatedAt: number
+  /**
+   * Set when nobody published this card and the workspace was read instead.
+   *
+   * A reader has to be able to tell what a session stands behind from what was
+   * inferred about it, so this rides into the listing rather than being
+   * silently indistinguishable.
+   */
+  readonly derived?: true
 }
 
 /** One resource a session is responsible for. */
@@ -191,6 +199,7 @@ export function ownersOf(
  */
 export function summarizeCard(card: CapabilityCard): string {
   const parts = [card.alias ? `"${card.alias}" — ${card.role}` : card.role]
+  if (card.derived === true) parts.push('inferred from the workspace, not declared')
   if (card.owns.length > 0) parts.push(`owns ${card.owns.map((o) => o.resource).join(', ')}`)
   if (card.skills.length > 0) parts.push(`skills: ${card.skills.join(', ')}`)
   if (card.groups.length > 0) parts.push(`groups: ${card.groups.map((g) => `#${g}`).join(', ')}`)

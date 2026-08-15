@@ -1,0 +1,71 @@
+{
+  "$comment": "Machine-readable description of this plugin, for catalogs and registries. Kept in step with the source by tests/manifest.test.ts.",
+  "manifest": 1,
+  "name": "dsh-agent-messaging",
+  "title": "Agent Messaging",
+  "summary": "Cross-session agent-to-agent messaging for DeepSeek Harness: claims, verification and a decision ledger, so two agent sessions don't repeat, contradict or deadlock each other.",
+  "description": "Two DSH sessions cannot tell each other anything. This gives them an address and a mailbox: one session names another and delivers a message into its inbox, which the harness schedules like any other model-facing input. Around that sit the things a pair of agents needs to not waste each other's turns — advisory claims on files, peer verification of claims neither can check alone, a durable decision ledger, task states with deadlock detection, and per-turn accounting of what coordination cost and caught. Arriving messages render as their own card in the Web UI transcript.",
+  "license": "MIT",
+  "author": "Kaixiang Ren",
+  "homepage": "https://github.com/happyren/dsh-agent-messaging",
+  "repository": "https://github.com/happyren/dsh-agent-messaging",
+  "discussions": "https://github.com/happyren/dsh-agent-messaging/discussions",
+  "categories": ["multi-agent", "coordination", "messaging", "workflow"],
+  "keywords": ["agent-to-agent", "cross-session", "claims", "verification", "decision-ledger", "deadlock", "a2a"],
+  "install": {
+    "npm": "dsh plugin --profile web add dsh-agent-messaging",
+    "git": "dsh plugin --profile web add github:happyren/dsh-agent-messaging"
+  },
+  "requires": {
+    "node": "^22.19.0 || >=24",
+    "harness": "developer preview (npm rc line); re-verify after a harness upgrade"
+  },
+  "surfaces": {
+    "host": true,
+    "web": true,
+    "headless": true
+  },
+  "tools": [
+    { "name": "peer_list", "summary": "Sessions this one can address, with what each owns and is working on.", "always": true },
+    { "name": "peer_send", "summary": "Deliver one message, choosing whether it interrupts, queues a turn, or waits quietly.", "always": true },
+    { "name": "peer_claim", "summary": "Announce what you are editing, and find out whether a peer is already on it.", "capability": "claims" },
+    { "name": "peer_verify", "summary": "Ask a differently-situated peer to check a claim you are about to act on.", "capability": "verification" },
+    { "name": "peer_verify_reply", "summary": "Answer a verification request with a typed verdict and what you examined.", "capability": "verification" },
+    { "name": "peer_card", "summary": "Declare an alias, a role, and what this session owns.", "capability": "identity" },
+    { "name": "peer_status", "summary": "Say what your work is doing, and find out if you have just deadlocked.", "capability": "identity" },
+    { "name": "peer_decide", "summary": "Record what was settled, so a later session does not reopen it.", "capability": "decisions" },
+    { "name": "peer_decisions", "summary": "Read the decisions in force for a file or topic.", "capability": "decisions" },
+    { "name": "peer_inbox", "summary": "Read and release messages held under the hold policy.", "condition": "inbound: hold" }
+  ],
+  "skills": [
+    {
+      "name": "peer-coordination",
+      "summary": "When coordinating with another session is worth a turn — and when silence is the right reply."
+    }
+  ],
+  "commands": [
+    { "name": "doctor", "run": "npx dsh-agent-messaging doctor", "summary": "Check the install and say what is wrong; exits non-zero on a blocking problem." },
+    { "name": "report", "run": "npx dsh-agent-messaging report", "summary": "What collaboration cost, and what it caught." }
+  ],
+  "capabilities": [
+    { "key": "claims", "default": true, "summary": "peer_claim" },
+    { "key": "verification", "default": true, "summary": "peer_verify, peer_verify_reply" },
+    { "key": "identity", "default": true, "summary": "peer_card, peer_status" },
+    { "key": "decisions", "default": true, "summary": "peer_decide, peer_decisions" }
+  ],
+  "config": {
+    "inbound": { "default": "accept", "values": ["accept", "hold", "refuse"], "summary": "What to do with an arriving message." },
+    "peerAuthority": { "default": "inform", "values": ["inform", "act"], "summary": "Whether an authorised peer's request may be acted on directly." },
+    "trustedPeers": { "default": [], "summary": "Peers authorised by peerAuthority: act, matched exactly." },
+    "groups": { "default": {}, "summary": "Named groups and their topology (mesh or star)." },
+    "skill": { "default": true, "summary": "Contribute the peer-coordination skill." },
+    "metrics": { "default": true, "summary": "Record local, content-free cost/catch counts." },
+    "a2aEndpoints": { "default": {}, "summary": "External Agent2Agent peers, outbound only." },
+    "stateRoot": { "default": "$DSH_HOME/agent-messaging", "summary": "Where claims, cards, the ledger, presence and the spool live." }
+  },
+  "privacy": {
+    "networkEgress": "none by default; only to A2A endpoints you configure",
+    "telemetry": "none",
+    "storedContent": "no message bodies are stored in the accounting; counts only"
+  }
+}
