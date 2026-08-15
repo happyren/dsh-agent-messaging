@@ -68,6 +68,25 @@ export interface Config {
    * are always treated as untrusted regardless of `peerAuthority`.
    */
   a2aEndpoints: Record<string, { url: string; token?: string }>
+  /**
+   * Which capabilities register tools.
+   *
+   * Every tool competes for a model's attention against everything else in the
+   * harness, so a deployment that does not use a capability should not pay for
+   * its description. All default on so an upgrade never silently removes a tool
+   * a workflow depends on; a deployment that wants a lean surface turns off what
+   * it does not use.
+   */
+  capabilities: {
+    /** `peer_claim`. Advisory work claims. */
+    claims: boolean
+    /** `peer_verify`, `peer_verify_reply`. Cross-session verification. */
+    verification: boolean
+    /** `peer_card`, `peer_status`. Self-declaration and task state. */
+    identity: boolean
+    /** `peer_decide`, `peer_decisions`. The shared decision ledger. */
+    decisions: boolean
+  }
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -148,4 +167,18 @@ export const Config: Schema<Config> = Schema.object({
   )
     .default({})
     .description('External Agent2Agent agents, keyed by local alias. Always treated as untrusted.'),
+  capabilities: Schema.object({
+    claims: Schema.boolean().default(true).description('peer_claim — advisory work claims.'),
+    verification: Schema.boolean()
+      .default(true)
+      .description('peer_verify and peer_verify_reply — cross-session verification.'),
+    identity: Schema.boolean()
+      .default(true)
+      .description('peer_card and peer_status — self-declaration and task state.'),
+    decisions: Schema.boolean()
+      .default(true)
+      .description('peer_decide and peer_decisions — the shared decision ledger.'),
+  })
+    .default({ claims: true, verification: true, identity: true, decisions: true })
+    .description('Which capabilities register tools. peer_list and peer_send are always registered.'),
 })
