@@ -149,6 +149,26 @@ export function peerAddress(peer: Pick<PeerDescriptor, 'name' | 'alias'>): strin
   return peer.alias ?? peer.name
 }
 
+/** Bounds of the coarse buckets {@link describeAge} reports in. */
+const MINUTE_MS = 60_000
+const HOUR_MS = 60 * MINUTE_MS
+const DAY_MS = 24 * HOUR_MS
+
+/**
+ * How long ago something happened, coarsely.
+ *
+ * Coarse on purpose: the reader is deciding whether a session is a colleague or
+ * a corpse, and "6h" answers that where "6h 14m" only adds noise.
+ * @param elapsedMs - milliseconds since the event.
+ * @returns a short human-readable age.
+ */
+export function describeAge(elapsedMs: number): string {
+  if (elapsedMs < MINUTE_MS) return 'just now'
+  if (elapsedMs < HOUR_MS) return `${Math.floor(elapsedMs / MINUTE_MS)}m ago`
+  if (elapsedMs < DAY_MS) return `${Math.floor(elapsedMs / HOUR_MS)}h ago`
+  return `${Math.floor(elapsedMs / DAY_MS)}d ago`
+}
+
 /**
  * Resolve a user- or model-supplied address to exactly one peer.
  *

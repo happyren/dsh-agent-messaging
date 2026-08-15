@@ -18,8 +18,9 @@
  */
 
 import { spawn } from 'node:child_process'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 
 import { SCENARIOS, scenario as byId } from './scenarios.mjs'
 import { renderComparison, summarize } from './score.mjs'
@@ -50,6 +51,90 @@ function parseArgs(argv) {
     else if (argv[i] === '--reset-state') args.resetState = argv[++i]
   }
   return args
+}
+
+/** A file under the harness's home. */
+function dshPath(...parts) {
+  const home = process.env.DSH_HOME?.trim()
+  const base = home && isAbsolute(home) ? home : join(homedir(), '.dsh')
+  return join(base, ...parts)
+}
+
+/** Where the harness keeps one workspace's sessions. */
+function sessionCorpus(workspace) {
+  return dshPath('sessions', `--${workspace.replaceAll('/', '-').replace(/^-+/, '')}--`)
+}
+
+/**
+ * Make the benchmark workspace the only one the harness knows about.
+ *
+ * Isolation is a precondition of the method — peers come from the session
+ * corpus, so a workspace with history in it lets a scenario address sessions
+ * from an earlier run, which is exactly how this benchmark's first result came
+ * out invalid. Selecting a workspace through the UI turned out to be
+ * undrivable, and the registry is the same decision expressed as data.
+ *
+ * The operator's registry is backed up and restored; their sessions are never
+ * touched, because only the registry entry is removed, not the corpus behind it.
+ */
+async function isolateRegistry(workspace) {
+  const path = dshPath('storages', 'workspace.json')
+  const backup = `${path}.bench-backup`
+  const cache = dshPath('storages', 'session_projcache.json')
+  const cacheBackup = `${cache}.bench-backup`
+
+  let store
+  try {
+    store = JSON.parse(await readFile(path, 'utf8'))
+    await copyFile(path, backup)
+  } catch {
+    store = { unit: { name: 'workspace', version: 2 }, global: { initialized: true, workspaceIds: [], archivedSessionIds: [] }, tables: { workspaces: {} } }
+  }
+  await copyFile(cache, cacheBackup).catch(() => {})
+
+  const id = 'bench-0000-0000-0000-000000000000'
+  const stamp = new Date().toISOString()
+  const isolated = {
+    unit: store.unit ?? { name: 'workspace', version: 2 },
+    global: { initialized: true, workspaceIds: [id], archivedSessionIds: [] },
+    tables: {
+      workspaces: {
+        [id]: {
+          path: workspace,
+          title: basename(workspace),
+          createdAt: stamp,
+          updatedAt: stamp,
+          sessionIds: [],
+        },
+      },
+    },
+  }
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, `${JSON.stringify(isolated, null, 1)}\n`)
+  // The cache indexes sessions by id; leaving it beside a registry that no
+  // longer mentions them is how the harness ends up failing to boot.
+  await rm(cache, { force: true })
+
+  return async () => {
+    await copyFile(backup, path).catch(() => {})
+    await rm(backup, { force: true })
+    await copyFile(cacheBackup, cache).catch(() => rm(cache, { force: true }))
+    await rm(cacheBackup, { force: true })
+  }
+}
+
+/**
+ * Drop the sessions the benchmark itself created.
+ *
+ * Safe to delete outright: this corpus belongs to the benchmark workspace, which
+ * the method requires be used for nothing else.
+ */
+async function clearBenchSessions(workspace) {
+  const corpus = sessionCorpus(workspace)
+  for (const name of await readdir(corpus).catch(() => [])) {
+    await rm(join(corpus, name), { recursive: true, force: true })
+  }
+  await rm(dshPath('storages', 'session_projcache.json'), { force: true })
 }
 
 /** Write a scenario's fixture into the benchmark workspace. */
@@ -104,7 +189,7 @@ async function startHost({ profile, port, cwd }) {
 }
 
 /** Drive one scenario's sessions and report the turns each spent. */
-async function driveSessions({ chromium, port, prompts, workspace }) {
+async function driveSessions({ chromium, port, prompts, workspace, concurrent }) {
   const browser = await chromium.launch({ headless: true })
   const turns = {}
   try {
@@ -164,16 +249,26 @@ async function driveSessions({ chromium, port, prompts, workspace }) {
       await page.waitForTimeout(250)
       await page.keyboard.press('Enter')
 
-      let started = false
-      for (let i = 0; i < TURN_TIMEOUT_S; i += 1) {
-        await page.waitForTimeout(1000)
-        const running = await page.evaluate(() =>
-          Boolean(document.querySelector('button[aria-label*="Stop" i]')),
-        )
-        if (running) started = true
-        else if (started && i > 2) break
+      // Submitting is what claims the reusable blank session, so prompts are
+      // always submitted one at a time. Whether the runner then WAITS is the
+      // scenario's call: a collision and a mutual wait only exist while two
+      // sessions overlap in time, and serialising them scored two of five
+      // scenarios as passes for the baseline — which means they measured
+      // nothing at all.
+      if (concurrent === true) {
+        await page.waitForTimeout(2500)
+      } else {
+        let started = false
+        for (let i = 0; i < TURN_TIMEOUT_S; i += 1) {
+          await page.waitForTimeout(1000)
+          const running = await page.evaluate(() =>
+            Boolean(document.querySelector('button[aria-label*="Stop" i]')),
+          )
+          if (running) started = true
+          else if (started && i > 2) break
+        }
+        await page.waitForTimeout(2000)
       }
-      await page.waitForTimeout(2000)
       turns[label] = { page, context }
     }
 
@@ -250,8 +345,12 @@ process.stderr.write(
     `Run against a workspace you keep for the benchmark and nothing else.\n`,
 )
 
+const restoreRegistry = await isolateRegistry(args.workspace)
+
 const runs = []
+try {
 for (const scenario of chosen) {
+  await clearBenchSessions(args.workspace)
   const root = args.workspace
   // Each scenario starts from the same fixture in the same workspace: a
   // registered workspace is state the harness owns, and a benchmark that
@@ -271,6 +370,7 @@ for (const scenario of chosen) {
       port: args.port,
       prompts: scenario.sessions,
       workspace: basename(root),
+      concurrent: scenario.concurrent === true,
     })
   } finally {
     host.kill()
@@ -282,6 +382,7 @@ for (const scenario of chosen) {
   const total = Object.values(driven.turns).reduce((sum, count) => sum + count, 0)
   runs.push({
     id: scenario.id,
+    ...(scenario.reproduces === false ? { reproduces: false } : {}),
     ...result,
     turns: total,
     perSession: driven.turns,
@@ -290,9 +391,26 @@ for (const scenario of chosen) {
   })
   process.stderr.write(`  ${result.verdict.toUpperCase()} · ${total} turns · ${result.why}\n`)
 }
+} finally {
+  await restoreRegistry()
+}
 
-const summary = summarize(runs)
+// A partial re-run replaces the scenarios it ran and leaves the rest alone:
+// scenarios get fixed one at a time, and re-running the whole matrix to correct
+// one of them costs an hour of model time for no new information.
 const out = join(dirname(new URL(import.meta.url).pathname), 'results', `${args.arm}.json`)
+let previous = []
+try {
+  previous = JSON.parse(await readFile(out, 'utf8')).rows ?? []
+} catch {
+  // First run for this arm.
+}
+const replaced = new Set(runs.map((run) => run.id))
+const merged = [...previous.filter((row) => !replaced.has(row.id)), ...runs]
+const order = SCENARIOS.map((entry) => entry.id)
+merged.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+
+const summary = summarize(merged)
 await mkdir(dirname(out), { recursive: true })
 await writeFile(out, `${JSON.stringify({ arm: args.arm, profile: args.profile, ...summary }, null, 2)}\n`)
 

@@ -91,6 +91,23 @@ export const SCENARIOS = [
   {
     id: 'collision',
     title: 'Two sessions edit one file',
+    concurrent: true,
+    /**
+     * Does not reproduce in this harness, and the reason is worth more than the
+     * scenario was.
+     *
+     * Run concurrently, both sessions' edits land intact: DSH's editor patches
+     * by string replacement, re-reading the file at write time, so the second
+     * write applies on top of the first instead of overwriting it. A classic
+     * lost update is structurally prevented.
+     *
+     * Step repetition is still MAST's largest failure mode — it simply cannot
+     * take this shape here. In a patch-based coding harness it shows up as
+     * duplicated effort: two sessions doing the same work and paying twice,
+     * which is a cost failure rather than a correctness one, and needs a
+     * scenario built around turns rather than bytes.
+     */
+    reproduces: false,
     /** FM-1.3 step repetition — 15.7% of observed multi-agent failures. */
     fixture: CHARGES_FIXTURE,
     sessions: {
@@ -138,6 +155,17 @@ export const SCENARIOS = [
   {
     id: 'mutual-wait',
     title: 'Both sessions wait for the other',
+    concurrent: true,
+    /**
+     * Does not reproduce, for a more encouraging reason: told not to guess a
+     * value another session owns, these models do the part they can and
+     * document what is missing rather than blocking. Both sessions moved even
+     * with real temporal overlap and an explicit instruction not to guess.
+     *
+     * A deadlock this benchmark could measure needs a dependency a session
+     * genuinely cannot work around — not merely one it has been told not to.
+     */
+    reproduces: false,
     /** FM-1.5 unaware of termination, 12.4%; FM-3.1 premature termination, 6.2%. */
     fixture: CHARGES_FIXTURE,
     sessions: {

@@ -540,27 +540,41 @@ collaboration costs — [that is how the 20 became a 7](#what-it-cost).
 The claim this project makes — coordination costs turns and saves more than it
 costs — was argued from runs whose scoring I wrote. [`bench/`](bench/) replaces
 that with something falsifiable: five scenarios an uncoordinated pair gets wrong,
-scored on **whether the repository ended up correct**, priced in model turns.
+scored on **whether the repository ended up correct**, priced in model turns. An
+arm is chosen by *profile*, so this plugin, a competing one, and no coordination
+at all are measured identically.
 
-```bash
-node bench/run.mjs --arm baseline --profile bench-baseline --workspace ~/dsh-bench
-node bench/run.mjs --arm plugin   --profile web --workspace ~/dsh-bench
-```
+DeepSeek-V4-Flash, one run per arm per scenario:
 
-An oracle reads the files on disk and nothing else. No credit for sending a
-message, taking a claim, or returning a verdict — coordination that does not
-change the outcome is pure cost. An arm is chosen by *profile*, so this plugin, a
-competing one, and no coordination at all are measured identically.
+| scenario | baseline | plugin |
+|---|---|---|
+| `stale-contract` | fail · 2t | **pass** · 4t |
+| `collision` | n/r · 2t | n/r · 3t |
+| `false-belief` | fail · 2t | fail · 5t |
+| `mutual-wait` | n/r · 2t | n/r · 8t |
+| `stale-decision` | fail · 2t | **pass** · 2t |
+| **passed** | **0/3** | **2/3** |
+| **turns on scoring scenarios** | 6 | 11 |
 
-**The first run came back invalid, and that is in the repository too.** In the
-plugin arm the client session read the ledger, found the requirement — the
-coordination worked — and then decided the fix belonged to a session it had seen
-in `peer_list`, which was a corpse from an earlier run. What got measured was my
-untidy workspace. The result is kept with that explanation rather than deleted,
-the methodology now states isolation as a precondition, and the underlying
-finding — [stale peers invite diffusion of
-responsibility](docs/roadmap.md#found-by-the-benchmark-stale-peers-diffuse-responsibility)
-— is on the roadmap as the plugin's problem to solve.
+**0 of 3 became 2 of 3, at roughly double the turns.** That is the claim measured
+against a control for the first time — and it is one run, which is an anecdote
+with a table around it.
+
+Three things the benchmark found that I would not have:
+
+- **Two scenarios don't reproduce their failure here** and are excluded rather
+  than counted. A lost update is structurally prevented by a patch-based editor;
+  a mutual wait doesn't happen because these models do the part they can rather
+  than block. Both are marked `n/r` — a benchmark whose author quietly banks free
+  passes is measuring its own suite length.
+- **Verification can change beliefs without changing actions.** In
+  `false-belief` the peer reviewed the file, corrected the false premise, and the
+  client recorded a superseding decision — then removed the field anyway on a
+  different rationale. Coordination worked; the outcome still failed.
+- **Stale peers invite diffusion of responsibility.** An earlier run was
+  invalidated when a session deferred work to peers that had been dead for hours,
+  because it read their titles and nothing contradicted it. Stopped sessions now
+  carry their age in `peer_list`.
 
 Read [`bench/README.md`](bench/README.md) before quoting any number from it,
 including mine.

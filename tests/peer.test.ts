@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { PeerError } from '../src/domain/errors.ts'
-import { assignPeerNames, peerAddress, resolvePeer, type PeerDescriptor } from '../src/domain/peer.ts'
+import { assignPeerNames, describeAge, peerAddress, resolvePeer, type PeerDescriptor } from '../src/domain/peer.ts'
 
 function peer(overrides: Partial<PeerDescriptor> & Pick<PeerDescriptor, 'sessionId' | 'name'>): PeerDescriptor {
   return {
@@ -128,5 +128,20 @@ describe('resolvePeer', () => {
   it('reports a miss', () => {
     expect(() => resolvePeer(peers, 'nothing')).toThrowError(/No session matches/)
     expect(() => resolvePeer(peers, '  ')).toThrow(PeerError)
+  })
+})
+
+describe('describeAge', () => {
+  it('answers colleague-or-corpse rather than reporting a duration', () => {
+    // The reader is deciding whether a session is working; "6h" settles that
+    // and "6h 14m 03s" only adds noise.
+    expect(describeAge(30_000)).toBe('just now')
+    expect(describeAge(9 * 60_000)).toBe('9m ago')
+    expect(describeAge(6 * 3_600_000)).toBe('6h ago')
+    expect(describeAge(3 * 86_400_000)).toBe('3d ago')
+  })
+
+  it('never reports a negative age from a clock that ran backwards', () => {
+    expect(describeAge(0)).toBe('just now')
   })
 })
