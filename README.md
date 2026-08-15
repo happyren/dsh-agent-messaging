@@ -136,6 +136,31 @@ delivered when it next starts, within the configured age and depth bounds.
 Replies correlate through `reply_to`, and the receiver is told to answer the sender's
 session id rather than its display name, which can change when a title is refolded.
 
+### `peer_claim`
+
+Announce what you are working on, and find out whether a peer is already on it.
+
+```
+peer_claim  resource: "client/checkout.ts"  intent: "threading tenant_id through"
+→ refused: overlaps a claim held by another session.
+  checkout-client holds "client" — refactoring the submit path (expires in ~24 min)
+  Message the holder with peer_send instead of working in parallel.
+```
+
+This targets the **largest single failure mode** in the
+[MAST taxonomy](https://arxiv.org/abs/2503.13657): *step repetition*, 15.7% of
+observed multi-agent failures — whose concrete instance in coding is two sessions
+editing the same file, or re-deriving what a sibling already knows.
+
+Path claims nest, so holding `client` covers `client/checkout.ts`, and sibling
+names never collide (`src/app` does not contain `src/apple`). Topics don't nest.
+Claims expire on their own, and are dropped when the holding session ends.
+
+Claims are **advisory, not locks.** The plugin cannot stop another process
+writing a file, and a lock that can't be enforced is worse than an honest hint —
+it invites callers to skip the check they'd otherwise make. Claimed resources
+show up in `peer_list` under `working_on`.
+
 ### `peer_inbox`
 
 Lists messages held for you under the `hold` policy, and releases them when your
