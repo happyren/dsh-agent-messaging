@@ -136,6 +136,30 @@ delivered when it next starts, within the configured age and depth bounds.
 Replies correlate through `reply_to`, and the receiver is told to answer the sender's
 session id rather than its display name, which can change when a title is refolded.
 
+### `peer_verify` and `peer_verify_reply`
+
+Ask a differently-situated peer to check a claim you're about to act on.
+
+```
+peer_verify  to: "payments-api"
+             claim: "createCharge rejects a blank tenant_id"
+             evidence: [{ locator: "api/charges.ts", at: "12", note: "the guard" }]
+```
+
+The peer is told to *check, not agree* — "go and look before answering; do not
+take the claim on trust" — and replies with a typed verdict: `confirmed`,
+`refuted`, `inconclusive`, or `declined`, plus what it actually examined.
+
+This targets MAST's **task-verification category (24.5% of failures)** and is the
+intervention with its largest measured gain (**+15.6%**). It belongs in a
+messaging plugin rather than an agent's own loop because
+[self-verification is known to fail](https://arxiv.org/pdf/2310.01798) — a model
+largely cannot check its own reasoning. A peer is a different verifier in the way
+that matters: it didn't produce the artefact, so it has to go and look.
+
+A `refuted` verdict comes back as a `steer`, because the asker is probably acting
+on the claim right now and a queued turn would arrive too late.
+
 ### `peer_claim`
 
 Announce what you are working on, and find out whether a peer is already on it.
