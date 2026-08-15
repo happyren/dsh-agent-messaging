@@ -1,0 +1,231 @@
+# Design note and roadmap
+
+Why this plugin is shaped the way it is, what the research says about
+agent-to-agent collaboration, and what gets built next.
+
+Every roadmap item below names the failure mode it attacks and the evidence it
+rests on. Items without evidence do not get built.
+
+## The uncomfortable finding
+
+Most published work on LLM multi-agent systems studies an **orchestrator with
+worker clones reasoning about the same problem**. Measured honestly, that
+topology usually loses:
+
+- Multi-agent debate does not reliably beat a single agent at equal token
+  budget, and most of the measured gain comes from **voting rather than from the
+  debate** ([ICLR 2025 blogpost][mad-blog], [When and Why Does MAD
+  Fail][mad-fail], [Talk Isn't Always Cheap][talk-cheap]).
+- Under normalised compute, single-agent systems match or beat multi-agent ones
+  across model families and architectures ([equal-budget study][equal-budget]).
+- Self-correction — the single-agent analogue — has the same negative result
+  ([Huang et al.][self-correct]).
+
+Where multi-agent *does* win, the reason is structural rather than social.
+Anthropic's research system improved on single-agent Opus by ~90% on their
+internal eval, at roughly **15× the tokens**, with token usage alone explaining
+about **80% of performance variance**; their stated lesson is that architecture
+must follow task structure, and that multi-agent pays only when work decomposes
+into genuinely independent threads with their own context windows
+([writeup][anthropic]).
+
+**The conclusion this plugin is built on:** the value of agent-to-agent
+communication is not more brains on one problem. It is **information
+asymmetry** — agents that are differently situated, holding different context,
+looking at different files. Two sessions in one repository are asymmetric by
+construction. Debate discards that asymmetry; exchange exploits it.
+
+## What actually goes wrong
+
+[MAST][mast] is the empirical grounding: 200+ tasks across 7 frameworks,
+hand-annotated by six experts (κ = 0.88) into 14 failure modes.
+
+| Category | Share | Largest modes |
+|---|---|---|
+| System design | 43.7% | step repetition **15.7%**, unaware of termination **12.4%**, disobey task spec 11.8% |
+| Inter-agent misalignment | 32.3% | reasoning-action mismatch 13.2%, task derailment 7.4%, fail to ask for clarification 6.8% |
+| Task verification | 24.5% | incorrect verification 9.1%, no/incomplete verification 8.2% |
+
+Their own interventions: improving role specification gained **+9.4%**, and
+adding verification of the high-level objective gained **+15.6%** — while
+overall completion stayed low, which they read as needing redesign rather than
+patches.
+
+A third of failures are specifically *inter-agent*. Those are the ones a
+messaging layer is positioned to remove, and they are what the roadmap targets.
+
+## Where this plugin sits
+
+Almost all of the literature studies orchestrator-worker trees. Long-lived
+**peer** sessions, with a human in several loops at once, is the under-studied
+quadrant — and the one developers actually work in.
+
+| Axis | Studied heavily | This plugin |
+|---|---|---|
+| Topology | orchestrator → workers | peers, no coordinator |
+| Lifetime | one task, then gone | long-lived, resumable |
+| Context | clones of one prompt | genuinely different repos, files, history |
+| Human | one, at the top | one, in several loops |
+
+The subagent subsystem already covers the first column. This plugin covers the
+second, and the roadmap should not drift back into the first.
+
+## Principles
+
+1. **Exploit asymmetry, never manufacture it.** No debate between clones, no
+   voting panels. A message is worth its tokens when the sender knows something
+   the receiver cannot see.
+2. **Every message costs the receiver a turn.** Denser topologies are not better
+   ([topology study][topology]); broadcast is a last resort.
+3. **Prefer traces to conversations.** Coordination through marks left in a
+   shared medium — stigmergy — avoids the N² chatter of negotiation
+   ([CodeCRDT][codecrdt]).
+4. **Common ground is durable, messages are not.** Shared understanding needs a
+   record, not a transcript ([Klein et al.][klein]).
+5. **Authority never travels in a message.** Enforcement stays with the
+   receiving session's own permissions; see the security model in the README.
+6. **If it cannot be measured, it cannot be steered.** Collaboration is
+   expensive, and the only reason anyone knows Anthropic's system was worth 15×
+   tokens is that they measured it.
+
+## Roadmap
+
+Ordered by impact-significance: the failure mass each item removes, weighted by
+the evidence behind it.
+
+### v0.0.3 — Work claims
+
+Advisory claims on a path or topic, with a TTL, visible to every peer.
+
+Attacks **FM-1.3 step repetition (15.7%)**, the largest single failure mode in
+MAST. The concrete instance in coding is two sessions editing the same file, or
+re-deriving a finding a sibling already has. Stigmergic by design: a claim is a
+mark in a shared medium, not a negotiation, so it costs no model calls
+([CodeCRDT][codecrdt]).
+
+Not a lock. The plugin cannot enforce one, and pretending otherwise would be
+worse than advisory honesty.
+
+### v0.0.4 — Verification requests
+
+Ask a peer to check a specific claim, with evidence pointers and a typed verdict.
+
+Attacks **FC3 task verification (24.5%)**, and is the intervention with the
+largest measured gain in MAST (**+15.6%**). Cross-session verification is
+qualitatively different from self-verification — which is known to fail
+([Huang et al.][self-correct]) — because the verifier holds different context and
+did not produce the artefact.
+
+### v0.0.5 — Capability and ownership cards
+
+Each session declares what it owns and what it is for; peers read it before
+addressing it.
+
+Attacks **FM-1.2 disobey role specification** and **FM-2.3 task derailment**
+(7.4%); role specification was MAST's other measured intervention (**+9.4%**).
+Shaped after [A2A][a2a] Agent Cards, so the same declaration can later serve
+cross-vendor discovery.
+
+### v0.0.6 — Task-state signalling
+
+Report *task* state — working, blocked-on-peer, done, abandoned — rather than
+only the process state (`idle`/`running`) the agent registry exposes.
+
+Attacks **FM-1.5 unaware of termination (12.4%)** and **FM-3.1 premature
+termination (6.2%)**. This is common ground in Klein's sense: a teammate that
+cannot signal completion or blockage cannot be coordinated with
+([Klein et al.][klein]).
+
+### v0.0.7 — Shared decision ledger
+
+An append-only record of what was decided, by whom, on what evidence, readable
+by any session at any time.
+
+Attacks **FM-1.4 loss of conversation history** and **FM-2.1 conversation
+reset**. Messages are ephemeral; common ground has to outlive them. Follows the
+**transactive memory** direction in the MAS memory literature — share an index of
+who knows what rather than replicating everyone's full memory
+([MATM][matm], [memory survey][mem-survey]).
+
+### v0.0.8 — Groups and topology control
+
+Named channels with an explicit shape: star through a lead, or mesh.
+
+Communication topology measurably changes both efficiency and quality, and
+denser is not automatically better ([topology study][topology]). Making the shape
+explicit beats an implicit all-to-all that degrades as sessions multiply.
+
+### v0.0.9 — A2A bridge
+
+Speak [Agent2Agent][a2a] so DSH sessions can reach agents outside DSH.
+
+A2A is the interoperability standard worth building against — donated by Google
+to the Linux Foundation with AWS, Cisco, Microsoft, Salesforce, SAP and
+ServiceNow as founding members, using JSON-RPC over HTTP/SSE with Agent Cards for
+discovery. Our envelope already carries identity, delivery semantics and reply
+correlation, so the mapping is small.
+
+Worth stating the known gap: these protocols still cannot express governance
+constraints such as authority scope ([governance analysis][governance]) — which
+is precisely what `peerAuthority` exists to keep outside the wire.
+
+### v0.0.10 — Collaboration accounting
+
+Turns caused by inbound messages, how many were acted on, duplicate work avoided.
+
+Without this, nobody — including us — can tell whether any of the above helps.
+Anthropic's 15× token result is the cautionary tale: collaboration is expensive,
+and it was only known to be worthwhile because it was measured
+([writeup][anthropic]).
+
+## Deliberately not building
+
+- **Debate or voting among peers.** The evidence is against it at equal budget,
+  and our peers are not clones — debate would discard the asymmetry that makes
+  them useful.
+- **A central orchestrator.** That is the subagent subsystem's job, and it is
+  already well covered by the harness.
+- **Automatic broadcast.** Every message costs the receiver a turn.
+
+## References
+
+**Failure modes and negative results**
+
+- Cemri et al., [*Why Do Multi-Agent LLM Systems Fail?*][mast] — the MAST taxonomy this roadmap is scored against.
+- [*Multi-LLM-Agents Debate — Performance, Efficiency, and Scaling Challenges*][mad-blog], ICLR 2025 blogposts.
+- [*When and Why Does Multi-Agent Debate Fail, and Does It Really Underperform?*][mad-fail]
+- [*Talk Isn't Always Cheap: Understanding Failure Modes in Multi-Agent Debate*][talk-cheap]
+- [*Single-Agent LLMs Outperform Multi-Agent Systems Under Equal Thinking Token Budgets*][equal-budget]
+- Huang et al., [*Large Language Models Cannot Self-Correct Reasoning Yet*][self-correct]
+
+**What works, and what it costs**
+
+- [*How Anthropic Built a Multi-Agent Research System*][anthropic] — ~90% gain, ~15× tokens, ~80% of variance explained by token usage.
+- [*Information Propagation Effects of Communication Topologies in LLM-based Multi-Agent Systems*][topology], EMNLP 2025.
+- [*CodeCRDT: Observation-Driven Coordination for Multi-Agent LLM Code Generation*][codecrdt] — stigmergic coordination for code agents.
+
+**Teamwork and memory**
+
+- Klein et al., [*Ten Challenges for Making Automation a "Team Player" in Joint Human-Agent Activity*][klein], IEEE Intelligent Systems, 2004.
+- [*Multi-Agent Transactive Memory*][matm] — population-level experience reuse.
+- [*Memory in LLM-based Multi-agent Systems: Mechanisms, Challenges, and Collective Intelligence*][mem-survey]
+
+**Interoperability**
+
+- [*Agent2Agent protocol*][a2a] — Google, donated to the Linux Foundation.
+- [*Governance Gaps in Agent Interoperability Protocols*][governance] — what MCP, A2A and ACP cannot express.
+
+[mast]: https://arxiv.org/abs/2503.13657
+[mad-blog]: https://d2jud02ci9yv69.cloudfront.net/2025-04-28-mad-159/blog/mad/
+[mad-fail]: https://arxiv.org/html/2510.20963v2
+[talk-cheap]: https://arxiv.org/pdf/2509.05396
+[equal-budget]: https://arxiv.org/html/2604.02460v1
+[self-correct]: https://arxiv.org/pdf/2310.01798
+[anthropic]: https://blog.bytebytego.com/p/how-anthropic-built-a-multi-agent
+[topology]: https://aclanthology.org/2025.emnlp-main.623/
+[codecrdt]: https://arxiv.org/pdf/2510.18893
+[klein]: https://dl.acm.org/doi/abs/10.1109/MIS.2004.74
+[matm]: https://arxiv.org/html/2606.19911v1
+[mem-survey]: https://www.techrxiv.org/users/1007269/articles/1367390
+[a2a]: https://en.wikipedia.org/wiki/Agent2Agent
+[governance]: https://arxiv.org/pdf/2606.31498
