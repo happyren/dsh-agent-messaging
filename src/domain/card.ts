@@ -16,6 +16,7 @@
  */
 
 import { normalizeResource, type ClaimScope } from './claim.ts'
+import { normalizeGroupName } from './group.ts'
 import { PeerError } from './errors.ts'
 
 /** Longest accepted role description. */
@@ -27,12 +28,24 @@ const MAX_OWNS = 20
 /** Most skills one card may declare. */
 const MAX_SKILLS = 12
 
+/** Most groups one card may join. */
+const MAX_GROUPS = 12
+
 /** Longest accepted skill label. */
 const MAX_SKILL_CHARS = 60
 
 /** One session's self-declared purpose and responsibilities. */
 export interface CapabilityCard {
   readonly sessionId: string
+  /**
+   * A short, stable handle this session answers to.
+   *
+   * Display names are folded from session titles, which are generated and
+   * change. An operator configuring a group lead, or a peer addressing a
+   * long-lived counterpart, needs a name that does not move — so a session
+   * declares one rather than inheriting whatever its title became.
+   */
+  readonly alias?: string
   /** What this session is for, in its own words. */
   readonly role: string
   /**
@@ -45,6 +58,13 @@ export interface CapabilityCard {
   readonly owns: readonly OwnedResource[]
   /** Short labels a peer can match a need against, e.g. `sql-migrations`. */
   readonly skills: readonly string[]
+  /**
+   * Groups this session belongs to, normalized without their `#` prefix.
+   *
+   * Declared here rather than through a join tool because a session's groups are
+   * part of what it is for, which is what a card answers.
+   */
+  readonly groups: readonly string[]
   /** Unix epoch milliseconds the card was last published. */
   readonly updatedAt: number
 }
@@ -58,9 +78,11 @@ export interface OwnedResource {
 /** Inputs for {@link createCard}; time is supplied, never read. */
 export interface CardDraft {
   readonly sessionId: string
+  readonly alias?: string
   readonly role: string
   readonly owns?: readonly { scope?: ClaimScope; resource: string }[]
   readonly skills?: readonly string[]
+  readonly groups?: readonly string[]
   readonly now: number
 }
 
@@ -104,11 +126,30 @@ export function createCard(draft: CardDraft): CapabilityCard {
       return skill
     })
 
+  const alias = draft.alias
+    ?.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  if (alias && alias.length > MAX_SKILL_CHARS) {
+    throw new PeerError('invalid-body', `Alias exceeds ${MAX_SKILL_CHARS} characters.`)
+  }
+
+  const groupsInput = draft.groups ?? []
+  if (groupsInput.length > MAX_GROUPS) {
+    throw new PeerError('invalid-body', `At most ${MAX_GROUPS} groups are accepted.`)
+  }
+  const groups = groupsInput
+    .filter((group) => group.trim().replace(/^#+/, '').trim().length > 0)
+    .map((group) => normalizeGroupName(group))
+
   return Object.freeze({
     sessionId: draft.sessionId,
+    ...(alias ? { alias } : {}),
     role,
     owns: Object.freeze(owns),
     skills: Object.freeze([...new Set(skills)]),
+    groups: Object.freeze([...new Set(groups)]),
     updatedAt: draft.now,
   })
 }
@@ -149,8 +190,9 @@ export function ownersOf(
  * @returns a compact single-line description, or an empty string when bare.
  */
 export function summarizeCard(card: CapabilityCard): string {
-  const parts = [card.role]
+  const parts = [card.alias ? `"${card.alias}" — ${card.role}` : card.role]
   if (card.owns.length > 0) parts.push(`owns ${card.owns.map((o) => o.resource).join(', ')}`)
   if (card.skills.length > 0) parts.push(`skills: ${card.skills.join(', ')}`)
+  if (card.groups.length > 0) parts.push(`groups: ${card.groups.map((g) => `#${g}`).join(', ')}`)
   return parts.join(' · ')
 }

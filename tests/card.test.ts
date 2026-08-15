@@ -177,3 +177,17 @@ describe('CardStore', () => {
     expect(await s.readAll()).toHaveLength(1)
   })
 })
+
+describe('card alias', () => {
+  it('slugifies a declared alias so configuration can rely on its shape', () => {
+    expect(card({ alias: '  Tech Lead ' } as never).alias).toBe('tech-lead')
+  })
+
+  it('omits an alias that was not declared', () => {
+    expect('alias' in card()).toBe(false)
+  })
+
+  it('leads the summary with the alias, since that is the addressable handle', () => {
+    expect(summarizeCard(card({ alias: 'tech-lead' } as never))).toMatch(/^"tech-lead" — /)
+  })
+})

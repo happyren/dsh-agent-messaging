@@ -136,6 +136,27 @@ delivered when it next starts, within the configured age and depth bounds.
 Replies correlate through `reply_to`, and the receiver is told to answer the sender's
 session id rather than its display name, which can change when a title is refolded.
 
+**Groups.** Address `#backend` to reach a whole set at once. Membership is declared
+on each session's `peer_card`, and the *shape* is an operator decision in config —
+because denser is not automatically better and every extra recipient costs a turn:
+
+```yaml
+- id: agent-messaging
+  config:
+    groups:
+      backend: { topology: star, lead: tech-lead }
+    maxFanout: 8
+```
+
+`mesh` reaches everyone; `star` routes a member's message to the lead alone and lets
+the lead broadcast — one message in costs one turn instead of N. Each recipient is
+an ordinary send, so inbound policy, loop control and accounting apply per
+recipient: a group address is a convenience for the sender, never a way around the
+receiver.
+
+Configure the lead against a session's **alias** (`peer_card alias: "tech-lead"`),
+not its display name — display names are folded from session titles and move.
+
 ### `peer_decide` and `peer_decisions`
 
 Record what was settled, so a session that starts later doesn't reopen it.

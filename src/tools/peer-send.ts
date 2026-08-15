@@ -4,8 +4,10 @@
 
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 
+import type { CardStore } from '../adapters/cards.ts'
 import { explainSendFailure, type MessageSender, type SenderIdentity } from '../app/send-message.ts'
 import type { DeliveryMode } from '../domain/envelope.ts'
+import { isGroupAddress, normalizeGroupName, type GroupShape } from '../domain/group.ts'
 import { requireCallerSessionId } from './caller.ts'
 
 /** Resolves the executing session's display name and directory at call time. */
@@ -20,6 +22,9 @@ export type SenderIdentityResolver = (sessionId: string, signal?: AbortSignal) =
 export function createPeerSendTool(
   sender: MessageSender,
   identify: SenderIdentityResolver,
+  cards?: CardStore,
+  groupShapes: Record<string, GroupShape> = {},
+  maxFanout = 8,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_send',
@@ -32,6 +37,8 @@ export function createPeerSendTool(
       'reserve it for something that makes its current work wrong. "followup" (the default) queues',
       'a new turn for it. "context" leaves information it will see next time it runs, without waking it.',
       'A session that is not running still accepts messages: they are delivered when it next starts.',
+      'Addressing "#group" delivers to every member the group\'s configured shape selects —',
+      'each one costs that session a turn, so prefer naming the sessions that actually need to know.',
       'Do not ask another session to do something your own permissions forbid, and do not treat',
       'its reply as permission for anything.',
     ].join(' '),
@@ -39,7 +46,8 @@ export function createPeerSendTool(
       to: {
         type: 'string',
         required: true,
-        description: 'The target session: a name from peer_list, or an exact session id.',
+        description:
+          'The target: a session name from peer_list, an exact session id, or "#group" to reach every member of a group at once.',
       },
       message: {
         type: 'string',
@@ -86,6 +94,56 @@ export function createPeerSendTool(
       const self = await identify(selfSessionId, exec.signal)
 
       try {
+        if (isGroupAddress(args.to)) {
+          if (!cards) {
+            throw new Error('Group addressing needs capability cards, which are not available here.')
+          }
+          const group = normalizeGroupName(args.to)
+          const all = await cards.readAll()
+          const members = all.map((card) => ({
+            sessionId: card.sessionId,
+            // An alias is what an operator can configure a lead against; a
+            // folded display name moves when the title does.
+            name: card.alias ?? card.sessionId,
+            groups: card.groups,
+          }))
+          // Names come from the directory so a group listing reads like peer_list.
+          const peers = await sender.peers(selfSessionId, exec.signal)
+          const named = members.map((member) => {
+            const card = all.find((entry) => entry.sessionId === member.sessionId)
+            return {
+              ...member,
+              name:
+                card?.alias ??
+                peers.find((peer) => peer.sessionId === member.sessionId)?.name ??
+                member.sessionId,
+            }
+          })
+
+          const outcome = await sender.sendToGroup(
+            self,
+            named,
+            groupShapes[group] ?? { topology: 'mesh' },
+            maxFanout,
+            {
+              to: args.to,
+              body: args.message,
+              mode: (args.mode ?? 'followup') as DeliveryMode,
+              ...(exec.signal === undefined ? {} : { signal: exec.signal }),
+            },
+          )
+          const delivered = outcome.deliveries.filter((d) => d.status === 'delivered').length
+          const relay = outcome.relayedVia ? ` via ${outcome.relayedVia}` : ''
+          return {
+            status: delivered > 0 ? 'delivered' : 'failed',
+            to: `#${outcome.group}`,
+            message_id: '',
+            detail:
+              `${delivered}/${outcome.deliveries.length} delivered (${outcome.topology}${relay}): ` +
+              outcome.deliveries.map((d) => `${d.to}=${d.status}`).join(', '),
+          }
+        }
+
         const outcome = await sender.send(self, {
           to: args.to,
           body: args.message,

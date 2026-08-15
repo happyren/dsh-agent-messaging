@@ -72,9 +72,12 @@ function isCard(value: unknown): value is CapabilityCard {
   return (
     typeof card['sessionId'] === 'string' &&
     typeof card['role'] === 'string' &&
+    (card['alias'] === undefined || typeof card['alias'] === 'string') &&
     typeof card['updatedAt'] === 'number' &&
     Array.isArray(card['skills']) &&
     card['skills'].every((skill) => typeof skill === 'string') &&
+    Array.isArray(card['groups']) &&
+    card['groups'].every((group) => typeof group === 'string') &&
     Array.isArray(card['owns']) &&
     card['owns'].every((owned) => {
       if (typeof owned !== 'object' || owned === null) return false

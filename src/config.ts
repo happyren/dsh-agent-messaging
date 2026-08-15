@@ -50,6 +50,17 @@ export interface Config {
   metrics: boolean
   /** How often buffered counts are flushed to disk, in milliseconds. */
   metricsFlushMs: number
+  /**
+   * Shape of each named group, keyed by group name without its `#`.
+   *
+   * Topology is a deployment decision rather than something that emerges from
+   * who happens to be running, because denser is not automatically better and
+   * every extra recipient costs a turn. A group with no entry here defaults to
+   * `mesh`.
+   */
+  groups: Record<string, { topology: 'mesh' | 'star'; lead?: string }>
+  /** Most recipients one group message may reach. */
+  maxFanout: number
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -108,4 +119,18 @@ export const Config: Schema<Config> = Schema.object({
     .min(1_000)
     .default(30_000)
     .description('How often buffered counts are flushed to disk.'),
+  groups: Schema.dict(
+    Schema.object({
+      topology: Schema.union(['mesh', 'star'] as const)
+        .default('mesh')
+        .description('mesh: everyone hears everyone. star: everything passes through the lead.'),
+      lead: Schema.string().description('The relaying session for a star group, by name or session id.'),
+    }),
+  )
+    .default({})
+    .description('Shape of each named group. A group with no entry defaults to mesh.'),
+  maxFanout: Schema.number()
+    .min(1)
+    .default(8)
+    .description('Most recipients one group message may reach, so one address cannot spend unbounded turns.'),
 })

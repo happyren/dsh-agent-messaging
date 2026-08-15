@@ -156,7 +156,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => {
     const disposers = [
       ctx.tools.register(createPeerListTool(sender, claims, cards, taskStates)),
-      ctx.tools.register(createPeerSendTool(sender, identify)),
+      ctx.tools.register(createPeerSendTool(sender, identify, cards, config.groups, config.maxFanout)),
       ctx.tools.register(createPeerInboxTool(inbound)),
       ctx.tools.register(createPeerClaimTool(claims, identify)),
       ctx.tools.register(createPeerVerifyTool(sender, identify, metrics)),
