@@ -136,6 +136,37 @@ delivered when it next starts, within the configured age and depth bounds.
 Replies correlate through `reply_to`, and the receiver is told to answer the sender's
 session id rather than its display name, which can change when a title is refolded.
 
+### `peer_status`
+
+Say what your *work* is doing — `working`, `blocked`, `done`, `abandoned` — and
+find out if you have just deadlocked.
+
+```
+peer_status  phase: "blocked"  blocked_on: "payments-api"
+             summary: "need the charge schema finalised"
+→ published: blocked
+  DEADLOCK — you are in a mutual wait:
+  checkout-client → payments-api → checkout-client
+  Nobody in this cycle will proceed on their own. Break it: message one of them
+  with peer_send, do the part you can without waiting, or ask your user to decide.
+```
+
+The agent registry already reports `idle`/`running`, but that describes a
+*driver*, not a task. A session is `idle` both when it has finished and when it
+is waiting on a peer — indistinguishable from outside, and the difference is
+exactly what a peer needs to decide whether to wait.
+
+This targets **FM-1.5 unaware of termination (12.4%)** and **FM-3.1 premature
+termination (6.2%)**, and is common ground in
+[Klein's sense](https://dl.acm.org/doi/abs/10.1109/MIS.2004.74) — a teammate that
+cannot signal completion or blockage cannot be coordinated with.
+
+Because `blocked` carries *who* it is blocked on, a mutual wait becomes
+representable and therefore detectable. The check runs when a session declares
+itself blocked, which is the moment a cycle can first close. Without it a
+deadlock is silent: every participant looks merely idle, nobody is finished, and
+nothing reports it.
+
 ### `peer_card`
 
 Declare what this session is for and what it owns, so peers route work correctly

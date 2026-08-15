@@ -5,10 +5,12 @@
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 
 import type { CardStore } from '../adapters/cards.ts'
+import type { TaskStateStore } from '../adapters/task-states.ts'
 import type { WorkClaims } from '../app/claim-work.ts'
 import type { MessageSender } from '../app/send-message.ts'
 import { summarizeCard } from '../domain/card.ts'
 import type { PeerDescriptor } from '../domain/peer.ts'
+import { summarizeTaskState } from '../domain/task-state.ts'
 import { requireCallerSessionId } from './caller.ts'
 
 /** Reachability as the model should reason about it. */
@@ -28,12 +30,14 @@ function reachability(peer: PeerDescriptor): string {
  * @param sender - the send use case, which also owns discovery.
  * @param claims - live work claims, so a caller sees who is on what.
  * @param cards - capability cards, so a caller sees what each peer is for.
+ * @param states - declared task states, so a caller sees what each peer's work is doing.
  * @returns the registry-ready definition.
  */
 export function createPeerListTool(
   sender: MessageSender,
   claims: WorkClaims,
   cards: CardStore,
+  states: TaskStateStore,
 ): ToolDefinition {
   return defineTool({
     name: 'peer_list',
@@ -61,6 +65,11 @@ export function createPeerListTool(
               type: 'string',
               description: "What this peer says it is for, and what it owns. Its own words, not a guess from its title.",
             },
+            task: {
+              type: 'string',
+              description:
+                "What this peer's work is doing, in its own words: working, blocked, done or abandoned. More informative than the process state.",
+            },
             working_on: {
               type: 'array',
               description: 'Resources this peer has claimed. Do not edit these without talking to them.',
@@ -82,6 +91,7 @@ export function createPeerListTool(
                     const head = `${peer.name} [${peer.state}]${title}${where}`
                     const held = peer.working_on ?? []
                     const lines = [head]
+                    if (peer.task) lines.push(`    task: ${peer.task}`)
                     if (peer.role) lines.push(`    ${peer.role}`)
                     if (held.length > 0) lines.push(`    working on: ${held.join(', ')}`)
                     return lines.join('\n')
@@ -92,12 +102,14 @@ export function createPeerListTool(
     },
     async execute(_args, exec) {
       const self = requireCallerSessionId(exec)
-      const [peers, held, published] = await Promise.all([
+      const [peers, held, published, declared] = await Promise.all([
         sender.peers(self, exec.signal),
         claims.all(),
         cards.readAll(),
+        states.readAll(),
       ])
       const cardBySession = new Map(published.map((card) => [card.sessionId, card]))
+      const stateBySession = new Map(declared.map((state) => [state.sessionId, state]))
 
       /** Claimed resources by holding session, so a caller sees who is on what. */
       const byHolder = new Map<string, string[]>()
@@ -110,12 +122,14 @@ export function createPeerListTool(
       return peers.map((peer) => {
         const working = byHolder.get(peer.sessionId) ?? []
         const card = cardBySession.get(peer.sessionId)
+        const task = stateBySession.get(peer.sessionId)
         return {
           name: peer.name,
           session_id: peer.sessionId,
           state: reachability(peer),
           ...(peer.title === undefined ? {} : { title: peer.title }),
           ...(peer.cwd === undefined ? {} : { cwd: peer.cwd }),
+          ...(task === undefined ? {} : { task: summarizeTaskState(task) }),
           ...(card === undefined ? {} : { role: summarizeCard(card) }),
           ...(working.length === 0 ? {} : { working_on: working }),
         }

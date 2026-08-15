@@ -16,6 +16,7 @@ import { MessageSender, type SenderIdentity } from './app/send-message.ts'
 import { AgentInboxSink } from './adapters/agent-sink.ts'
 import { CardStore } from './adapters/cards.ts'
 import { ClaimStore } from './adapters/claims.ts'
+import { TaskStateStore } from './adapters/task-states.ts'
 import { SessionQueryPeerDirectory } from './adapters/directory.ts'
 import { PresenceStore, socketPathFor } from './adapters/presence.ts'
 import { FileOutboxSpool } from './adapters/spool.ts'
@@ -31,6 +32,7 @@ import { createPeerClaimTool } from './tools/peer-claim.ts'
 import { createPeerInboxTool } from './tools/peer-inbox.ts'
 import { createPeerListTool } from './tools/peer-list.ts'
 import { createPeerSendTool } from './tools/peer-send.ts'
+import { createPeerStatusTool } from './tools/peer-status.ts'
 import { createPeerVerifyReplyTool, createPeerVerifyTool } from './tools/peer-verify.ts'
 import { Config } from './config.ts'
 
@@ -111,6 +113,7 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   const cards = new CardStore({ stateRoot, logger })
+  const taskStates = new TaskStateStore({ stateRoot, logger })
 
   /**
    * Resolve this session's own peer identity from the shared directory, so the
@@ -127,15 +130,26 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
+  /**
+   * Resolve a peer address to its session id, so a wait graph built from
+   * human-written names still has one vocabulary.
+   */
+  const resolveSessionId = async (address: string, signal?: AbortSignal): Promise<string | undefined> => {
+    const wanted = address.trim().toLowerCase()
+    const peers = await directory.list(signal)
+    return peers.find((peer) => peer.sessionId === address || peer.name.toLowerCase() === wanted)?.sessionId
+  }
+
   ctx.effect(() => {
     const disposers = [
-      ctx.tools.register(createPeerListTool(sender, claims, cards)),
+      ctx.tools.register(createPeerListTool(sender, claims, cards, taskStates)),
       ctx.tools.register(createPeerSendTool(sender, identify)),
       ctx.tools.register(createPeerInboxTool(inbound)),
       ctx.tools.register(createPeerClaimTool(claims, identify)),
       ctx.tools.register(createPeerVerifyTool(sender, identify)),
       ctx.tools.register(createPeerVerifyReplyTool(sender, identify)),
       ctx.tools.register(createPeerCardTool(cards)),
+      ctx.tools.register(createPeerStatusTool(taskStates, identify, resolveSessionId)),
     ]
     return () => {
       for (const dispose of disposers) dispose()
@@ -164,6 +178,9 @@ export function apply(ctx: Context, config: Config): void {
     })
     void cards.withdraw(agent.id).catch((error: unknown) => {
       logger.warn(`could not withdraw card for ${agent.id}: ${describe(error)}`)
+    })
+    void taskStates.withdraw(agent.id).catch((error: unknown) => {
+      logger.warn(`could not withdraw task state for ${agent.id}: ${describe(error)}`)
     })
   })
 
