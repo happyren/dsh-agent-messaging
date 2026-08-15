@@ -29,6 +29,7 @@ import { createPeerClaimTool } from './tools/peer-claim.ts'
 import { createPeerInboxTool } from './tools/peer-inbox.ts'
 import { createPeerListTool } from './tools/peer-list.ts'
 import { createPeerSendTool } from './tools/peer-send.ts'
+import { createPeerVerifyReplyTool, createPeerVerifyTool } from './tools/peer-verify.ts'
 import { Config } from './config.ts'
 
 export const name = PLUGIN_NAME
@@ -128,6 +129,8 @@ export function apply(ctx: Context, config: Config): void {
       ctx.tools.register(createPeerSendTool(sender, identify)),
       ctx.tools.register(createPeerInboxTool(inbound)),
       ctx.tools.register(createPeerClaimTool(claims, identify)),
+      ctx.tools.register(createPeerVerifyTool(sender, identify)),
+      ctx.tools.register(createPeerVerifyReplyTool(sender, identify)),
     ]
     return () => {
       for (const dispose of disposers) dispose()

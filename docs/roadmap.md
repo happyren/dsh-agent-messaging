@@ -106,7 +106,7 @@ mark in a shared medium, not a negotiation, so it costs no model calls
 Not a lock. The plugin cannot enforce one, and pretending otherwise would be
 worse than advisory honesty.
 
-### v0.0.4 — Verification requests
+### v0.0.4 — Verification requests  ✅ shipped
 
 Ask a peer to check a specific claim, with evidence pointers and a typed verdict.
 
