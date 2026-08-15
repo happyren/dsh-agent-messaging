@@ -23,7 +23,9 @@ import { SessionQueryPeerDirectory } from './adapters/directory.ts'
 import { PresenceStore, socketPathFor } from './adapters/presence.ts'
 import { FileOutboxSpool } from './adapters/spool.ts'
 import { createHostId, resolveStateRoot, systemClock, uuidIdFactory } from './adapters/system.ts'
+import { createEndpoint, type A2AEndpoint } from './domain/a2a.ts'
 import { parseEnvelope } from './domain/envelope.ts'
+import { A2AClient } from './adapters/transport/a2a-client.ts'
 import { InboxClient } from './adapters/transport/inbox-client.ts'
 import { InboxServer } from './adapters/transport/inbox-server.ts'
 import { RoutingTransport } from './adapters/transport/routing-transport.ts'
@@ -95,12 +97,29 @@ export function apply(ctx: Context, config: Config): void {
     metrics,
   })
 
+  // A misconfigured endpoint is reported and skipped rather than failing the
+  // plugin: local messaging must not stop working because one URL is wrong.
+  const a2aEndpoints: Record<string, A2AEndpoint> = {}
+  for (const [alias, entry] of Object.entries(config.a2aEndpoints)) {
+    try {
+      const endpoint = createEndpoint({
+        alias,
+        url: entry.url,
+        ...(entry.token === undefined ? {} : { token: entry.token }),
+      })
+      a2aEndpoints[endpoint.alias] = endpoint
+    } catch (error) {
+      logger.warn(`ignoring A2A endpoint "${alias}": ${describe(error)}`)
+    }
+  }
+
   const directory = new SessionQueryPeerDirectory({
     sessionQuery: ctx.sessionQuery,
     agents: ctx.agents,
     presence,
     logger,
     includeSubagents: config.includeSubagents,
+    a2aEndpoints,
   })
 
   const transport = new RoutingTransport({
@@ -109,6 +128,8 @@ export function apply(ctx: Context, config: Config): void {
     spool,
     spoolOffline: config.spoolOffline,
     metrics,
+    a2aClient: new A2AClient({ timeoutMs: config.deliveryTimeoutMs }),
+    a2aEndpoints,
   })
 
   const sender = new MessageSender({

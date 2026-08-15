@@ -61,6 +61,13 @@ export interface Config {
   groups: Record<string, { topology: 'mesh' | 'star'; lead?: string }>
   /** Most recipients one group message may reach. */
   maxFanout: number
+  /**
+   * External agents reachable over Agent2Agent, keyed by a local alias.
+   *
+   * They appear in `peer_list` and accept `peer_send` like any other peer, and
+   * are always treated as untrusted regardless of `peerAuthority`.
+   */
+  a2aEndpoints: Record<string, { url: string; token?: string }>
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -133,4 +140,12 @@ export const Config: Schema<Config> = Schema.object({
     .min(1)
     .default(8)
     .description('Most recipients one group message may reach, so one address cannot spend unbounded turns.'),
+  a2aEndpoints: Schema.dict(
+    Schema.object({
+      url: Schema.string().required().description('Absolute JSON-RPC endpoint. https, or localhost.'),
+      token: Schema.string().description('Optional bearer token.'),
+    }),
+  )
+    .default({})
+    .description('External Agent2Agent agents, keyed by local alias. Always treated as untrusted.'),
 })

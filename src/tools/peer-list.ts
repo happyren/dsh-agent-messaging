@@ -20,6 +20,8 @@ function reachability(peer: PeerDescriptor): string {
       return peer.status === 'running' ? 'running' : 'idle'
     case 'remote':
       return 'running (another host process)'
+    case 'a2a':
+      return 'external agent (A2A)'
     case 'offline':
       return 'not running'
   }

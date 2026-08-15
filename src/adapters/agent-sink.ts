@@ -52,7 +52,12 @@ export class AgentInboxSink implements InboxSink {
     }
 
     const source: PeerMessageSource = { kind: 'plugin', plugin: PLUGIN_NAME, form: 'relay' }
-    const authority = decideAuthority(this.#authority, envelope.from)
+    // An external A2A sender is never elevated. The protocol cannot express
+    // authority scope, so a stranger must not be able to claim standing by
+    // choosing its own identifiers.
+    const authority = envelope.from.sessionId.startsWith('a2a:')
+      ? 'inform'
+      : decideAuthority(this.#authority, envelope.from)
     const message = createUserMessage({
       content: [{ type: 'text', text: renderInbound(envelope, authority) }],
       source,

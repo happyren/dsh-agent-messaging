@@ -367,6 +367,36 @@ The report states its own limit at the bottom, and means it: a caught collision
 is a real save, but these counts cannot tell you whether the turns spent were
 worth it.
 
+## Reaching agents outside DSH
+
+Configure an [Agent2Agent](https://en.wikipedia.org/wiki/Agent2Agent) endpoint and
+it becomes an ordinary peer — it shows up in `peer_list` and accepts `peer_send`:
+
+```yaml
+- id: agent-messaging
+  config:
+    a2aEndpoints:
+      reviewer: { url: "https://reviewer.example/a2a", token: "…" }
+```
+
+A2A is the agent-to-agent standard worth building against — Google donated it to
+the Linux Foundation, with AWS, Cisco, Microsoft, Salesforce, SAP and ServiceNow
+among the founding members — and it complements MCP rather than competing:
+**MCP connects an agent to tools, A2A connects agents to each other.**
+
+Two boundaries worth knowing:
+
+- **External senders are never elevated.** A2A [cannot express authority
+  scope](https://arxiv.org/pdf/2606.31498), so an external agent is always
+  `inform`, whatever `peerAuthority` says and whatever it claims about itself.
+  Trust is a property of your configuration, not of a field a stranger can set.
+- **Outbound only.** DSH sessions can reach out; external agents cannot reach in.
+  Serving an Agent Card needs an HTTP surface and its own authorization story,
+  and shipping half of that would be worse than shipping none.
+
+Endpoints must be `https`, or `localhost` for local development. A misconfigured
+endpoint is logged and skipped — local messaging keeps working.
+
 ## How it reaches another process
 
 One `dsh` host holds many sessions, so discovery and delivery split:
