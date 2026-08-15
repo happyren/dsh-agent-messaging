@@ -26,6 +26,13 @@ export interface PeerDirectoryOptions {
   readonly includeSubagents: boolean
   /** External agents this deployment can reach, keyed by alias. */
   readonly a2aEndpoints?: Record<string, A2AEndpoint>
+  /**
+   * The aliases sessions have published about themselves, by session id.
+   *
+   * Supplied as a reader rather than a store so the directory keeps knowing
+   * nothing about capability cards; without it, peers simply carry no alias.
+   */
+  readonly readAliases?: () => Promise<ReadonlyMap<string, string>>
 }
 
 /** Builds {@link PeerDescriptor}s from the harness session corpus. */
@@ -36,6 +43,7 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
   readonly #logger: Logger
   readonly #includeSubagents: boolean
   readonly #a2aEndpoints: Record<string, A2AEndpoint>
+  readonly #readAliases: () => Promise<ReadonlyMap<string, string>>
 
   constructor(options: PeerDirectoryOptions) {
     this.#sessionQuery = options.sessionQuery
@@ -44,6 +52,7 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
     this.#logger = options.logger
     this.#includeSubagents = options.includeSubagents
     this.#a2aEndpoints = options.a2aEndpoints ?? {}
+    this.#readAliases = options.readAliases ?? (() => Promise.resolve(new Map()))
   }
 
   /**
@@ -52,9 +61,10 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
    * @returns the peer set with names assigned and locations resolved.
    */
   async list(signal?: AbortSignal): Promise<readonly PeerDescriptor[]> {
-    const [records, remoteHosts] = await Promise.all([
+    const [records, remoteHosts, aliases] = await Promise.all([
       this.#sessionQuery.listSessions(signal),
       this.#readPresence(),
+      this.#aliases(),
     ])
 
     const visible = records.filter(
@@ -104,6 +114,7 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
       return {
         sessionId,
         name: names.get(sessionId) ?? sessionId,
+        ...(aliases.get(sessionId) === undefined ? {} : { alias: aliases.get(sessionId) as string }),
         ...(title === undefined ? {} : { title }),
         ...(record.header.cwd === undefined ? {} : { cwd: record.header.cwd }),
         createdAt: record.header.createdAt,
@@ -116,6 +127,22 @@ export class SessionQueryPeerDirectory implements PeerDirectory {
     })
 
     return [...sessions, ...external]
+  }
+
+  /**
+   * Read published aliases, tolerating an unavailable card store.
+   * @returns session id to published alias, empty when unreadable.
+   */
+  async #aliases(): Promise<ReadonlyMap<string, string>> {
+    try {
+      return await this.#readAliases()
+    } catch (error) {
+      // Addressing by name and id must survive an unreadable card directory.
+      this.#logger.warn(
+        `capability cards unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      return new Map()
+    }
   }
 
   async #readPresence(): Promise<readonly { hostId: string; socketPath: string; sessions: readonly string[] }[]> {

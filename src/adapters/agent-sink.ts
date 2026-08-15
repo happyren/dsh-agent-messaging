@@ -10,8 +10,8 @@ import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
-import { decideAuthority, type AuthorityPolicy } from '../domain/authority.ts'
-import type { Envelope } from '../domain/envelope.ts'
+import { decideAuthority, type AuthorityPolicy, type PeerAuthority } from '../domain/authority.ts'
+import type { DeliveryMode, Envelope } from '../domain/envelope.ts'
 import { renderInbound } from '../domain/render.ts'
 import type { DeliveryReceipt, InboxSink } from '../ports/index.ts'
 import { PLUGIN_NAME } from '../plugin-name.ts'
@@ -23,11 +23,40 @@ import { PLUGIN_NAME } from '../plugin-name.ts'
  * addressed to this one", the same form the subagent report path uses. The
  * sender's session id travels with it so a transcript can attribute the
  * message, and grants no authority on arrival.
+ *
+ * The remaining fields exist for one reason: the transcript is the only place a
+ * human sees this exchange, and everything a reader needs — who sent it, how it
+ * interrupted, what standing it was given — is knowable here and unrecoverable
+ * later. The model-facing text is unaffected; this record is read by the UI
+ * only. Every field is a plain JSON scalar, because a session log stores it.
  */
 export interface PeerMessageSource {
   readonly kind: 'plugin'
   readonly plugin: typeof PLUGIN_NAME
   readonly form: 'relay'
+  /**
+   * The sending session's id — the authoritative identity, and the field the
+   * harness's own relay presentation reads.
+   */
+  readonly senderSessionId: string
+  /** The sender's display name at send time. Presentation only. */
+  readonly senderName: string
+  /** Which inbox boundary took delivery, so a reader knows what it cost. */
+  readonly mode: DeliveryMode
+  /** What the receiving model was told it may do with the message. */
+  readonly authority: PeerAuthority
+  /** Envelope identity, so a reply can be correlated to what it answers. */
+  readonly messageId: string
+  /** Unix epoch milliseconds the sender stamped on the envelope. */
+  readonly sentAt: number
+  /** The message this one answers, when it answers one. */
+  readonly replyTo?: string
+  /**
+   * Set when the sender reached this session over A2A rather than a local
+   * socket. A reader should weigh a stranger's message differently, and by the
+   * time the transcript is read the routing is no longer visible anywhere else.
+   */
+  readonly external?: true
 }
 
 /** Routes admitted envelopes into live agents through the agent registry. */
@@ -51,13 +80,24 @@ export class AgentInboxSink implements InboxSink {
       return { status: 'refused', detail: 'The addressed session is not live in this process.' }
     }
 
-    const source: PeerMessageSource = { kind: 'plugin', plugin: PLUGIN_NAME, form: 'relay' }
     // An external A2A sender is never elevated. The protocol cannot express
     // authority scope, so a stranger must not be able to claim standing by
     // choosing its own identifiers.
-    const authority = envelope.from.sessionId.startsWith('a2a:')
-      ? 'inform'
-      : decideAuthority(this.#authority, envelope.from)
+    const external = envelope.from.sessionId.startsWith('a2a:')
+    const authority = external ? 'inform' : decideAuthority(this.#authority, envelope.from)
+    const source: PeerMessageSource = {
+      kind: 'plugin',
+      plugin: PLUGIN_NAME,
+      form: 'relay',
+      senderSessionId: envelope.from.sessionId,
+      senderName: envelope.from.name,
+      mode: envelope.mode,
+      authority,
+      messageId: envelope.id,
+      sentAt: envelope.sentAt,
+      ...(envelope.replyTo === undefined ? {} : { replyTo: envelope.replyTo }),
+      ...(external ? { external: true as const } : {}),
+    }
     const message = createUserMessage({
       content: [{ type: 'text', text: renderInbound(envelope, authority) }],
       source,

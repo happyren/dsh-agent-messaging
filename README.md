@@ -44,17 +44,38 @@ queued message."*
 
 ![The sending session finds its peer and delivers a steer](docs/media/demo-01-send.png)
 
-**The checkout session is interrupted, verifies the claim, and answers.** The message
-arrives as a `Context injection · dsh-agent-messaging` row. Note what it does with
-it: reads `api/charges.ts` to *check* the claim rather than believing it, replies to
-the sender, and reports to its own user — *"treated it as information, not
-instructions."*
+**The checkout session is interrupted, verifies the claim, and answers.** Note what
+it does with the message: reads `api/charges.ts` to *check* the claim rather than
+believing it, replies to the sender, and reports to its own user — *"treated it as
+information, not instructions."*
 
 ![The receiving session verifies the claim and replies](docs/media/demo-02-receive.png)
 
 That refusal to act is the default, and it is deliberate. See
 [Collaboration and safety](#collaboration-and-safety) for how to let sessions
 actually make edits for each other.
+
+### In the transcript
+
+An arriving message is its own card, so a reader can tell at a glance that another
+agent spoke — not the human, and not the harness injecting context. It names the
+sender, what the delivery cost (`interrupted this step`, `next turn`, or
+`delivered quietly`), what this session was told it may do about it, and the
+message itself rather than the framing around it.
+
+![A peer message rendered as its own card](docs/media/agent-message-card.png)
+
+![The same card in dark mode](docs/media/agent-message-card-dark.png)
+
+The harness's own `Context injection` row stays directly beneath it. That is not
+redundancy: the card is the human-facing view, and the row beneath still holds the
+exact bytes the model read, untrusted-content notice and all. The card never
+claims to be that text — and says so when it cannot parse it.
+
+![The card in a session transcript, above the harness's context row](docs/media/agent-message-card-in-context.png)
+
+This needs the Web UI. Everything else works headless; without the browser half,
+messages simply render as the harness's ordinary context row.
 
 ## What it is not
 
@@ -241,13 +262,19 @@ Declare what this session is for and what it owns, so peers route work correctly
 instead of guessing from a folded title.
 
 ```
-peer_card  role: "Payments API owner. I do NOT own client code."
+peer_card  alias: "payments-api"
+           role: "Payments API owner. I do NOT own client code."
            owns: [{ resource: "api/charges.ts" }, { resource: "charge validation rules", scope: "topic" }]
            skills: ["payments-api", "validation-rules"]
 ```
 
 It then appears in every peer's `peer_list`, and a session with work to route
 reads it rather than guessing.
+
+An `alias` is a **stable address**, not decoration. Display names are folded from
+session titles, so they move when a title changes; an alias is chosen and stays
+put. Every address a peer can use — `peer_send`, `peer_verify`, a group lead, a
+`blocked_on` — resolves an alias ahead of a derived name.
 
 This targets **FM-1.2 disobey role specification** and **FM-2.3 task derailment
 (7.4%)**; role specification was one of only two interventions MAST measured
@@ -510,6 +537,12 @@ The layering keeps policy testable without a running harness: `src/domain` is pu
 imports no framework, `src/app` holds the use cases behind the interfaces in
 `src/ports`, and `src/adapters` binds those to Cordis, the agent registry, sockets and
 disk.
+
+`src/client` is the browser half, built separately (`lib/client.js`, its own
+tsconfig, DOM and JSX instead of Node) and served by the harness to the Web UI.
+Its projection and formatting are pure functions, so the transcript card is
+tested here rather than in a browser; the round trip that matters — the record
+the host writes, read back by the card — is pinned in `tests/agent-sink.test.ts`.
 
 `tests/scenario.integration.test.ts` is the one that proves the README's actual
 claim. It runs a three-session team through a breaking contract change on the real

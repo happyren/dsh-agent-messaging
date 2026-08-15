@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // The browser half runs in a page, not in Node: it needs the DOM and the
+    // automatic JSX runtime, and it must NOT see Node's globals — a client
+    // bundle that reached for `process` would fail only once it shipped.
+    "lib": ["ES2023", "DOM"],
+    "types": [],
+    "jsx": "react-jsx"
+  },
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx"],
+  "exclude": []
+}

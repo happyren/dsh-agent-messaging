@@ -41,10 +41,38 @@ app/            MessageSender · InboundRouter           (use cases)
 domain/         Envelope · PeerDescriptor · LoopGuard · render  (pure)
    ▲
 adapters/       sessionQuery · agent registry · UDS · presence · spool
+
+client/         projection · card · styles              (browser half)
 ```
 
 `index.ts` is the only file that knows about all of them: it builds the graph,
 registers the tools, and hands every long-lived resource to the fiber that owns it.
+
+`client/` is a second program, not a layer of the first: it is built separately,
+runs in the Web UI, and shares nothing with the host half but the pure record
+format they both read. It has no path back to the host — no RPC, no service, no
+state of its own — because everything a transcript card needs is already in the
+durable message it is presenting.
+
+## The transcript card
+
+An arriving peer message is a `user/message` event whose source this plugin
+wrote. The harness projects that event into its generic injected-context row; the
+browser half claims the same event and publishes a second, richer node anchored
+just above it, dispatched through the harness's keyed `conversation.chat.node`
+slot.
+
+Two rows for one message is the deliberate outcome. Every registered projection
+that matches an event contributes a node — the engine has no notion of one
+definition claiming an event away from another — so the harness's row cannot be
+suppressed by a plugin. That is the honest arrangement anyway: the card is the
+human-facing presentation, while the row beneath it holds the exact model-facing
+bytes, framing included.
+
+The card carries no copy of the message. The body is read back out of the framed
+text through the same tag vocabulary `render.ts` writes, and a body that does not
+parse is shown verbatim and labelled as such — a card that quietly presented
+harness framing as the sender's words would be worse than no card.
 
 ## Decisions
 
@@ -145,6 +173,18 @@ which defeats the attribution the receiver is shown.
 - **Per-session sockets, matching how other tools do it.** Rejected for the
   file-descriptor churn described above; the harness's own multi-session host makes
   a per-host inbox the natural unit.
+- **A custom durable event behind the transcript card.** It would have given the
+  card a row of its own with nothing beside it. But a log containing an event type
+  outside the harness's known vocabulary is *refused on reload* unless the
+  envelope is marked `ignorable`, and `Session.append` exposes no way to mark one —
+  the harness records that a registration surface for downstream plugin events is
+  deferred until a consumer exists. Shipping it would have made a user's session
+  unopenable. The card is derived from the event the harness already writes, and
+  this plugin adds nothing to the log.
+- **Taking over the harness's `context` renderer.** One key, one occupant: a
+  second registration for it throws. Claiming it would also mean re-implementing
+  every other context presentation — instructions, catalogs, recalls — and owning
+  that drift forever, to change one of them.
 
 ## What would change the design
 
