@@ -8,7 +8,7 @@
 
 import type { Envelope } from '../domain/envelope.ts'
 import { decideInbound, LoopGuard, type InboundPolicy } from '../domain/policy.ts'
-import type { Clock, DeliveryReceipt, InboxSink } from '../ports/index.ts'
+import { noMetrics, type Clock, type DeliveryReceipt, type InboxSink, type MetricsSink } from '../ports/index.ts'
 
 /** One message set aside for operator release. */
 export interface HeldMessage {
@@ -25,6 +25,8 @@ export interface InboundRouterOptions {
   readonly clock: Clock
   /** Most messages retained for release before the oldest is discarded. */
   readonly maxHeld: number
+  /** Where admission outcomes are counted. Defaults to counting nothing. */
+  readonly metrics?: MetricsSink
 }
 
 /** Applies admission to arriving envelopes for one host process. */
@@ -34,6 +36,7 @@ export class InboundRouter {
   readonly #sink: InboxSink
   readonly #clock: Clock
   readonly #maxHeld: number
+  readonly #metrics: MetricsSink
   /** Held messages by recipient session id, oldest first. */
   readonly #held = new Map<string, HeldMessage[]>()
 
@@ -43,6 +46,7 @@ export class InboundRouter {
     this.#sink = options.sink
     this.#clock = options.clock
     this.#maxHeld = options.maxHeld
+    this.#metrics = options.metrics ?? noMetrics
   }
 
   /**
@@ -54,6 +58,7 @@ export class InboundRouter {
     const decision = decideInbound(this.#policy)
 
     if (decision.kind === 'refuse') {
+      this.#metrics.record('message-refused')
       return { status: 'refused', detail: decision.reason }
     }
 
@@ -61,15 +66,22 @@ export class InboundRouter {
     // runaway sender cannot fill the held queue either.
     const admitted = this.#guard.admit(envelope, this.#clock.now())
     if (!admitted.ok) {
+      this.#metrics.record('message-dropped')
       return { status: 'dropped', detail: admitted.reason }
     }
 
     if (decision.kind === 'hold') {
       this.#hold(envelope)
+      this.#metrics.record('message-held')
       return { status: 'held', detail: decision.reason }
     }
 
-    return this.#sink.deliver(envelope)
+    const receipt = this.#sink.deliver(envelope)
+    // Counted at the point of acceptance: a delivered message is a turn the
+    // receiving session would not otherwise have spent, and that is the cost
+    // side of the ledger.
+    if (receipt.status === 'delivered') this.#metrics.record('message-delivered')
+    return receipt
   }
 
   /**

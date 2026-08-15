@@ -7,6 +7,7 @@
  */
 
 import type { Envelope } from '../domain/envelope.ts'
+import type { MetricKind } from '../domain/metrics.ts'
 import type { PeerDescriptor } from '../domain/peer.ts'
 
 /** What happened to one delivery attempt. */
@@ -94,3 +95,21 @@ export interface Logger {
   warn(message: string, ...args: unknown[]): void
   error(message: string, ...args: unknown[]): void
 }
+
+/**
+ * Where collaboration counts go.
+ *
+ * Synchronous and failure-free by contract: accounting sits inside delivery, and
+ * a plugin that breaks because it could not count would be a worse trade than
+ * missing numbers. Implementations buffer and swallow their own errors.
+ */
+export interface MetricsSink {
+  /**
+   * Count one occurrence.
+   * @param kind - what happened.
+   */
+  record(kind: MetricKind): void
+}
+
+/** A sink that counts nothing, for tests and for accounting turned off. */
+export const noMetrics: MetricsSink = { record: () => {} }

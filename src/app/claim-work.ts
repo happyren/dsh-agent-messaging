@@ -7,7 +7,7 @@
  */
 
 import { createClaim, findConflicts, type Claim, type ClaimScope } from '../domain/claim.ts'
-import type { Clock } from '../ports/index.ts'
+import { noMetrics, type Clock, type MetricsSink } from '../ports/index.ts'
 
 /** Where claims are read from and written to. */
 export interface ClaimRepository {
@@ -47,10 +47,12 @@ export interface ClaimOutcome {
 export class WorkClaims {
   readonly #repository: ClaimRepository
   readonly #clock: Clock
+  readonly #metrics: MetricsSink
 
-  constructor(deps: { repository: ClaimRepository; clock: Clock }) {
+  constructor(deps: { repository: ClaimRepository; clock: Clock; metrics?: MetricsSink }) {
     this.#repository = deps.repository
     this.#clock = deps.clock
+    this.#metrics = deps.metrics ?? noMetrics
   }
 
   /**
@@ -81,6 +83,9 @@ export class WorkClaims {
       now,
     )
     if (conflicts.length > 0 && request.force !== true) {
+      // The clearest save this plugin produces: a session was about to work a
+      // resource a peer already holds, and did not.
+      this.#metrics.record('claim-conflict')
       return { granted: false, conflicts }
     }
 
@@ -90,6 +95,7 @@ export class WorkClaims {
     )
     await this.#repository.publish(holder.sessionId, [...own, candidate])
 
+    this.#metrics.record('claim-granted')
     return { granted: true, conflicts, claim: candidate }
   }
 
