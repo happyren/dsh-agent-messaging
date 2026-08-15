@@ -14,6 +14,7 @@ import { WorkClaims } from './app/claim-work.ts'
 import { InboundRouter } from './app/receive-message.ts'
 import { MessageSender, type SenderIdentity } from './app/send-message.ts'
 import { AgentInboxSink } from './adapters/agent-sink.ts'
+import { CardStore } from './adapters/cards.ts'
 import { ClaimStore } from './adapters/claims.ts'
 import { SessionQueryPeerDirectory } from './adapters/directory.ts'
 import { PresenceStore, socketPathFor } from './adapters/presence.ts'
@@ -25,6 +26,7 @@ import { InboxServer } from './adapters/transport/inbox-server.ts'
 import { RoutingTransport } from './adapters/transport/routing-transport.ts'
 import { LoopGuard } from './domain/policy.ts'
 import { PLUGIN_NAME } from './plugin-name.ts'
+import { createPeerCardTool } from './tools/peer-card.ts'
 import { createPeerClaimTool } from './tools/peer-claim.ts'
 import { createPeerInboxTool } from './tools/peer-inbox.ts'
 import { createPeerListTool } from './tools/peer-list.ts'
@@ -108,6 +110,8 @@ export function apply(ctx: Context, config: Config): void {
     clock: systemClock,
   })
 
+  const cards = new CardStore({ stateRoot, logger })
+
   /**
    * Resolve this session's own peer identity from the shared directory, so the
    * name a sender stamps on a message is the same name the recipient would see
@@ -125,12 +129,13 @@ export function apply(ctx: Context, config: Config): void {
 
   ctx.effect(() => {
     const disposers = [
-      ctx.tools.register(createPeerListTool(sender, claims)),
+      ctx.tools.register(createPeerListTool(sender, claims, cards)),
       ctx.tools.register(createPeerSendTool(sender, identify)),
       ctx.tools.register(createPeerInboxTool(inbound)),
       ctx.tools.register(createPeerClaimTool(claims, identify)),
       ctx.tools.register(createPeerVerifyTool(sender, identify)),
       ctx.tools.register(createPeerVerifyReplyTool(sender, identify)),
+      ctx.tools.register(createPeerCardTool(cards)),
     ]
     return () => {
       for (const dispose of disposers) dispose()
@@ -156,6 +161,9 @@ export function apply(ctx: Context, config: Config): void {
     republish()
     void claims.withdrawAll(agent.id).catch((error: unknown) => {
       logger.warn(`could not release claims for ${agent.id}: ${describe(error)}`)
+    })
+    void cards.withdraw(agent.id).catch((error: unknown) => {
+      logger.warn(`could not withdraw card for ${agent.id}: ${describe(error)}`)
     })
   })
 
