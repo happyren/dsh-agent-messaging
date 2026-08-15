@@ -152,10 +152,20 @@ export function findWaitCycle(states: readonly TaskState[], from: string): reado
 
 /**
  * Render a task state as one line for a peer listing.
+ *
+ * A wait is *stored* as a session id, because that is the only form a cycle can
+ * be walked in — but an id is not an address a reader can act on, so the caller
+ * supplies the names it already has.
  * @param state - the state to summarize.
+ * @param nameOf - resolves a session id to the address peers call it by;
+ * an unresolvable id is shown as recorded rather than hidden.
  * @returns a compact description.
  */
-export function summarizeTaskState(state: TaskState): string {
-  const blocked = state.blockedOn ? ` on ${state.blockedOn}` : ''
+export function summarizeTaskState(
+  state: TaskState,
+  nameOf?: (sessionId: string) => string | undefined,
+): string {
+  const waiting = state.blockedOn === undefined ? undefined : (nameOf?.(state.blockedOn) ?? state.blockedOn)
+  const blocked = waiting === undefined ? '' : ` on ${waiting}`
   return `${state.phase}${blocked}: ${state.summary}`
 }

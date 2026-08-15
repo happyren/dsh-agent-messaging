@@ -137,6 +137,19 @@ describe('summarizeTaskState', () => {
   it('omits the blocker when there is none', () => {
     expect(summarizeTaskState(state({ phase: 'done', summary: 'shipped' }))).toBe('done: shipped')
   })
+
+  it('shows a wait by the address peers call that session, not by its id', () => {
+    // The id is what makes a cycle walkable; it is not what a reader can act on.
+    const blocked = state({ phase: 'blocked', blockedOn: 'session-b', summary: 'need the schema' })
+    expect(summarizeTaskState(blocked, (id) => (id === 'session-b' ? 'payments-api' : undefined))).toBe(
+      'blocked on payments-api: need the schema',
+    )
+  })
+
+  it('shows an unresolvable wait as recorded rather than hiding it', () => {
+    const blocked = state({ phase: 'blocked', blockedOn: 'session-gone', summary: 'need the schema' })
+    expect(summarizeTaskState(blocked, () => undefined)).toBe('blocked on session-gone: need the schema')
+  })
 })
 
 describe('TaskStateStore', () => {

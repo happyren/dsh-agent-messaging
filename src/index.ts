@@ -12,7 +12,8 @@ import type { Context } from '@deepseek-ai/cordis'
 
 import { WorkClaims } from './app/claim-work.ts'
 import { InboundRouter } from './app/receive-message.ts'
-import { MessageSender, type SenderIdentity } from './app/send-message.ts'
+import { MessageSender } from './app/send-message.ts'
+import { createIdentityResolver } from './app/identity.ts'
 import { AgentInboxSink } from './adapters/agent-sink.ts'
 import { CardStore } from './adapters/cards.ts'
 import { ClaimStore } from './adapters/claims.ts'
@@ -161,20 +162,7 @@ export function apply(ctx: Context, config: Config): void {
   const taskStates = new TaskStateStore({ stateRoot, logger })
   const decisions = new DecisionStore({ stateRoot, logger })
 
-  /**
-   * Resolve this session's own peer identity from the shared directory, so the
-   * name a sender stamps on a message is the same name the recipient would see
-   * in its own listing.
-   */
-  const identify = async (sessionId: string, signal?: AbortSignal): Promise<SenderIdentity> => {
-    const peers = await directory.list(signal)
-    const self = peers.find((peer) => peer.sessionId === sessionId)
-    return {
-      sessionId,
-      name: self?.name ?? sessionId,
-      ...(self?.cwd === undefined ? {} : { cwd: self.cwd }),
-    }
-  }
+  const identify = createIdentityResolver(directory)
 
   /**
    * Resolve a peer address to its session id, so a wait graph built from

@@ -32,57 +32,115 @@ session "payments-api"                      session "checkout-client"
         │   — your call site will break"               │
 ```
 
-## Demo
+An arriving message is its own card in the transcript, so a reader can tell at a
+glance that another *agent* spoke — not the human, and not the harness injecting
+context:
 
-A real run, in two sessions of one `dsh web` host, over a toy repo where each
-session owns a different file.
+![A peer message rendered as its own card: sender payments-api, interrupted this step, information only](docs/media/card.png)
 
-**The payments session changes the contract, then picks a delivery mode.** It finds
-the affected session with `peer_list`, edits `api/charges.ts`, and reasons about
-urgency on its own: *"it's mid-task, so I'll use `steer` (interrupt) rather than a
-queued message."*
+![The same card in dark mode](docs/media/card-dark.png)
 
-![The sending session finds its peer and delivers a steer](docs/media/demo-01-send.png)
+It names the sender, what the delivery cost (`interrupted this step`, `next turn`,
+or `delivered quietly`), what this session was told it may do about it, and the
+message itself rather than the framing around it. The accent colour is derived
+from the sender's session id, so one peer keeps one colour even if its title
+changes.
 
-**The checkout session is interrupted, verifies the claim, and answers.** Note what
-it does with the message: reads `api/charges.ts` to *check* the claim rather than
-believing it, replies to the sender, and reports to its own user — *"treated it as
-information, not instructions."*
+## One real run, end to end
 
-![The receiving session verifies the claim and replies](docs/media/demo-02-receive.png)
+Everything below is a single live run: four sessions with real models in one
+`dsh web` host, over a repo where each session owns a different directory. No
+mock-ups — these are screenshots of the run that produced the numbers further
+down.
 
-That refusal to act is the default, and it is deliberate. See
-[Collaboration and safety](#collaboration-and-safety) for how to let sessions
-actually make edits for each other.
+**1 · Who's who.** Each session publishes a capability card: an alias, what it
+owns, and what it is *not* responsible for.
 
-### In the transcript
+```
+peer_card  alias: "payments-api"
+           role: "Owns api/ and the charge contract. I do NOT own client code."
+           owns: [{ resource: "api" }]
+           groups: ["backend"]
+```
 
-An arriving message is its own card, so a reader can tell at a glance that another
-agent spoke — not the human, and not the harness injecting context. It names the
-sender, what the delivery cost (`interrupted this step`, `next turn`, or
-`delivered quietly`), what this session was told it may do about it, and the
-message itself rather than the framing around it.
+**2 · A collision, refused.** `payments-api` claims `api/charges.ts`. Moments
+later the checkout session tries to claim `api/` — and is told who holds what
+beneath it, and why.
 
-![A peer message rendered as its own card](docs/media/agent-message-card.png)
+![The checkout session's claim on api/ is refused, naming payments-api as the holder](docs/media/claim-refused.png)
 
-![The same card in dark mode](docs/media/agent-message-card-dark.png)
+The interesting part is the last paragraph: without being asked, it decides *not*
+to edit in parallel and to coordinate first. That is the largest single failure
+mode in the [MAST taxonomy](https://arxiv.org/abs/2503.13657) — step repetition,
+15.7% of observed multi-agent failures — not happening.
 
-The harness's own `Context injection` row stays directly beneath it. That is not
-redundancy: the card is the human-facing view, and the row beneath still holds the
-exact bytes the model read, untrusted-content notice and all. The card never
-claims to be that text — and says so when it cannot parse it.
+**3 · A breaking change, delivered mid-task.** `payments-api` edits the file for
+real, then steers the peer whose call site it just broke. The receiving session
+does not take the claim on trust: it reads both files, confirms the change is
+real, and only then acts — on a file it owns.
 
-![The card in a session transcript, above the harness's context row](docs/media/agent-message-card-in-context.png)
+![The receiving session gets the card, replies, reads both files, and claims its own file before editing](docs/media/card-in-context.png)
 
-This needs the Web UI. Everything else works headless; without the browser half,
-messages simply render as the harness's ordinary context row.
+**4 · A false belief, caught before it ships.** The checkout session is about to
+drop the `currency` field, believing the API rejects non-USD. It asks the peer
+that owns that file to check — and is refuted.
+
+![payments-api refutes the claim after reading the file, and declines to send an acknowledgement](docs/media/verify-refuted.png)
+
+Two things in one screenshot. The refutation is the point:
+[self-verification is known to fail](https://arxiv.org/pdf/2310.01798), and a
+peer that didn't write the code has to go and look. The second thing is the model
+declining to send a courtesy reply — *"sending a 'noted' back would just cost them
+a turn"* — which is [the fix described below](#what-it-cost) doing its job.
+
+**5 · A mutual wait, made visible.** The docs session declares itself blocked on
+checkout; checkout is already blocked on docs. The cycle is reported the moment
+it closes.
+
+![The docs session declares itself blocked and is told it is in a deadlock cycle](docs/media/deadlock.png)
+
+Without this, a deadlock is silent: every participant looks merely `idle`, nobody
+is finished, and nothing reports it.
+
+**6 · A newcomer that reads the history it was never told.** A fifth session,
+started fresh and told only to add currency validation, finds the recorded
+decision, checks it against the current file, and refuses — offering supersession
+as the only correct route.
+
+![A new session finds the recorded decision and declines to reopen it](docs/media/newcomer-ledger.png)
+
+## What it cost
+
+The same scenario, run twice, on the same models — with one sentence changed in
+`peer_send`'s description between the runs:
+
+| | before | after |
+|---|---|---|
+| messages delivered | 20 | **7** |
+| dropped by loop control | 2 | 0 |
+| collisions avoided | 1 | 1 |
+| false claims caught | 1 | 1 |
+| deadlocks detected | 1 | 1 |
+
+The first run's transcripts showed why: once the work was done the sessions kept
+going — *"Noted, thanks."* → *"Anytime — good luck."* → *"Thanks, will keep you
+posted."* → *"Perfect — I'm here."* — until loop control dropped a duplicate and
+one of them observed, in its own words, that the exchange had wound down.
+
+Autonomous peers are polite, and politeness costs a turn each time. The fix was
+one sentence telling them not to be:
+
+> Every message costs the receiver a turn, so send only what changes what it will
+> do. Do NOT send acknowledgements, thanks, sign-offs, or "noted" — a peer that
+> has nothing to act on is better left working.
+
+**65% less traffic, identical catches.** That is what the accounting is for: it
+made a prompt-level regression visible, and then showed the fix worked. Run it on
+your own work with `npm run report`.
 
 ## What it is not
 
-The harness already covers the neighbouring cases, and this plugin deliberately does
-not duplicate them:
-
-| You want | Use |
+| If you want | Use |
 |---|---|
 | To pull another session's history into your next message | [`dsh-session-reference`](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/session-reference.md) (`@[label](dsh-session:…)`) |
 | A coordinator that spawns and supervises workers | the [subagent](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/subagent.md) subsystem |
@@ -118,7 +176,9 @@ Restart the profile afterwards, and verify the layer loaded:
 dsh --profile web --dump-config
 ```
 
-You should see a `# == dsh-agent-messaging` layer.
+You should see a `# == dsh-agent-messaging` layer. The transcript card needs the
+Web UI; everything else works headless, and without the browser half a message
+renders as the harness's ordinary context row.
 
 ## Tools
 
@@ -148,13 +208,22 @@ Sessions this one can address — name, state, title, directory. Identities only
 never their contents.
 
 ```
-checkout-client [idle] "Wire up checkout submit" — /repo/test-project
 payments-api [running] "Add tenant_id to charges" — /repo/test-project
+    "payments-api" — Owns api/ and the charge contract. I do NOT own client code. · owns api · groups: #backend
+    working on: api/charges.ts (adding a required tenant_id to ChargeRequest)
+checkout-client [idle] "Wire up checkout submit" — /repo/test-project
+    task: blocked on docs-writer: waiting on billing wording before updating checkout
+    "checkout-client" — Owns client/ and the checkout flow. · owns client · groups: #backend
+ready-57a1 [not running] "ready." — /repo/test-project
 ```
 
-Names come from each session's folded title, falling back to its directory, then its
-id, and are collision-disambiguated — so an address you read in one listing still
-resolves in the next.
+A session that published a card is listed by its **alias** — the last line above
+is one that did not, folded from a session whose first reply happened to be
+"ready.", which is exactly why an alias is worth publishing. Names are
+collision-disambiguated, so an address you read in one listing still resolves in
+the next. A wait is stored as a session id, because that is the only form a
+deadlock cycle can be walked in, but it is *shown* as the address you would use
+to break it.
 
 ### `peer_send`
 
@@ -174,8 +243,8 @@ sender knows whether the news invalidates work already in progress.
 A session that is **not running** still accepts messages: they are spooled and
 delivered when it next starts, within the configured age and depth bounds.
 
-Replies correlate through `reply_to`, and the receiver is told to answer the sender's
-session id rather than its display name, which can change when a title is refolded.
+Replies correlate through `reply_to`. The tool tells senders not to send
+acknowledgements — [the measured reason](#what-it-cost) is above.
 
 **Groups.** Address `#backend` to reach a whole set at once. Membership is declared
 on each session's `peer_card`, and the *shape* is an operator decision in config —
@@ -185,7 +254,7 @@ because denser is not automatically better and every extra recipient costs a tur
 - id: agent-messaging
   config:
     groups:
-      backend: { topology: star, lead: tech-lead }
+      backend: { topology: star, lead: payments-api }
     maxFanout: 8
 ```
 
@@ -195,66 +264,8 @@ an ordinary send, so inbound policy, loop control and accounting apply per
 recipient: a group address is a convenience for the sender, never a way around the
 receiver.
 
-Configure the lead against a session's **alias** (`peer_card alias: "tech-lead"`),
+Configure the lead against a session's **alias** (`peer_card alias: "payments-api"`),
 not its display name — display names are folded from session titles and move.
-
-### `peer_decide` and `peer_decisions`
-
-Record what was settled, so a session that starts later doesn't reopen it.
-
-```
-peer_decisions  about: "api/charges.ts"
-→ 2026-08-14 13:58 · record-billing-decisions [api/charges.ts]
-    currency stays hardcoded to "usd" for now; multi-currency deferred until
-    billing supports it
-    why: billing does not support multi-currency yet
-    id: 4f2a…
-```
-
-Messages are ephemeral — delivered once, folded into a transcript, gone when that
-session compacts or ends. Common ground has to outlive them, which needs a record
-rather than a conversation. This targets **FM-1.4 loss of conversation history**
-and **FM-2.1 conversation reset**.
-
-It's the [transactive-memory](https://arxiv.org/html/2606.19911v1) direction:
-rather than replicating every session's context into every other, publish the
-small durable index of *conclusions* and let peers query it by area. A directory
-covers what's beneath it, same nesting rule as claims and ownership.
-
-**Nothing is ever edited or deleted — decisions are superseded.** A later decision
-names the one it replaces; `peer_decisions` returns only what's in force, so
-nobody acts on a reversed decision, and `include_superseded` shows the history.
-
-### `peer_status`
-
-Say what your *work* is doing — `working`, `blocked`, `done`, `abandoned` — and
-find out if you have just deadlocked.
-
-```
-peer_status  phase: "blocked"  blocked_on: "payments-api"
-             summary: "need the charge schema finalised"
-→ published: blocked
-  DEADLOCK — you are in a mutual wait:
-  checkout-client → payments-api → checkout-client
-  Nobody in this cycle will proceed on their own. Break it: message one of them
-  with peer_send, do the part you can without waiting, or ask your user to decide.
-```
-
-The agent registry already reports `idle`/`running`, but that describes a
-*driver*, not a task. A session is `idle` both when it has finished and when it
-is waiting on a peer — indistinguishable from outside, and the difference is
-exactly what a peer needs to decide whether to wait.
-
-This targets **FM-1.5 unaware of termination (12.4%)** and **FM-3.1 premature
-termination (6.2%)**, and is common ground in
-[Klein's sense](https://dl.acm.org/doi/abs/10.1109/MIS.2004.74) — a teammate that
-cannot signal completion or blockage cannot be coordinated with.
-
-Because `blocked` carries *who* it is blocked on, a mutual wait becomes
-representable and therefore detectable. The check runs when a session declares
-itself blocked, which is the moment a cycle can first close. Without it a
-deadlock is silent: every participant looks merely idle, nobody is finished, and
-nothing reports it.
 
 ### `peer_card`
 
@@ -263,18 +274,19 @@ instead of guessing from a folded title.
 
 ```
 peer_card  alias: "payments-api"
-           role: "Payments API owner. I do NOT own client code."
-           owns: [{ resource: "api/charges.ts" }, { resource: "charge validation rules", scope: "topic" }]
+           role: "Owns api/ and the charge contract. I do NOT own client code."
+           owns: [{ resource: "api" }, { resource: "charge validation rules", scope: "topic" }]
            skills: ["payments-api", "validation-rules"]
+           groups: ["backend"]
 ```
 
-It then appears in every peer's `peer_list`, and a session with work to route
-reads it rather than guessing.
-
 An `alias` is a **stable address**, not decoration. Display names are folded from
-session titles, so they move when a title changes; an alias is chosen and stays
-put. Every address a peer can use — `peer_send`, `peer_verify`, a group lead, a
-`blocked_on` — resolves an alias ahead of a derived name.
+session titles, so they move — and read like an accident (`ready-57a1`) when a
+title is short. An alias is chosen and stays put. Every address a peer can use —
+`peer_send`, `peer_verify`, a group lead, a `blocked_on` — resolves an alias ahead
+of a derived name, and a session that published one is *referred to* by it in
+every record a peer reads: refused claims, decisions, waits, and the card on a
+delivered message.
 
 This targets **FM-1.2 disobey role specification** and **FM-2.3 task derailment
 (7.4%)**; role specification was one of only two interventions MAST measured
@@ -287,38 +299,15 @@ conflicts and reserves nothing. `peer_claim` is the short-lived "I am editing th
 right now" signal. Saying what you *don't* own is as useful as what you do, since
 it stops peers sending you work that isn't yours.
 
-### `peer_verify` and `peer_verify_reply`
-
-Ask a differently-situated peer to check a claim you're about to act on.
-
-```
-peer_verify  to: "payments-api"
-             claim: "createCharge rejects a blank tenant_id"
-             evidence: [{ locator: "api/charges.ts", at: "12", note: "the guard" }]
-```
-
-The peer is told to *check, not agree* — "go and look before answering; do not
-take the claim on trust" — and replies with a typed verdict: `confirmed`,
-`refuted`, `inconclusive`, or `declined`, plus what it actually examined.
-
-This targets MAST's **task-verification category (24.5% of failures)** and is the
-intervention with its largest measured gain (**+15.6%**). It belongs in a
-messaging plugin rather than an agent's own loop because
-[self-verification is known to fail](https://arxiv.org/pdf/2310.01798) — a model
-largely cannot check its own reasoning. A peer is a different verifier in the way
-that matters: it didn't produce the artefact, so it has to go and look.
-
-A `refuted` verdict comes back as a `steer`, because the asker is probably acting
-on the claim right now and a queued turn would arrive too late.
-
 ### `peer_claim`
 
 Announce what you are working on, and find out whether a peer is already on it.
 
 ```
-peer_claim  resource: "client/checkout.ts"  intent: "threading tenant_id through"
-→ refused: overlaps a claim held by another session.
-  checkout-client holds "client" — refactoring the submit path (expires in ~24 min)
+peer_claim  resource: "api"  intent: "adding tenant support to the charge call"
+→ refused: "api" overlaps a claim held by another session.
+  payments-api holds "api/charges.ts" — adding a required tenant_id to
+  ChargeRequest (expires in ~30 min)
   Message the holder with peer_send instead of working in parallel.
 ```
 
@@ -335,6 +324,89 @@ Claims are **advisory, not locks.** The plugin cannot stop another process
 writing a file, and a lock that can't be enforced is worse than an honest hint —
 it invites callers to skip the check they'd otherwise make. Claimed resources
 show up in `peer_list` under `working_on`.
+
+### `peer_verify` and `peer_verify_reply`
+
+Ask a differently-situated peer to check a claim you're about to act on.
+
+```
+peer_verify  to: "payments-api"
+             claim: "createCharge rejects any currency other than usd"
+             evidence: [{ locator: "api/charges.ts" }]
+→ REFUTED — createCharge only validates amount_cents and tenant_id;
+  currency is never checked, so non-USD currencies are accepted.
+```
+
+The peer is told to *check, not agree* — "go and look before answering; do not
+take the claim on trust" — and replies with a typed verdict: `confirmed`,
+`refuted`, `inconclusive`, or `declined`, plus what it actually examined.
+
+This targets MAST's **task-verification category (24.5% of failures)** and is the
+intervention with its largest measured gain (**+15.6%**). It belongs in a
+messaging plugin rather than an agent's own loop because
+[self-verification is known to fail](https://arxiv.org/pdf/2310.01798) — a model
+largely cannot check its own reasoning. A peer is a different verifier in the way
+that matters: it didn't produce the artefact, so it has to go and look.
+
+A `refuted` verdict comes back as a `steer`, because the asker is probably acting
+on the claim right now and a queued turn would arrive too late.
+
+### `peer_status`
+
+Say what your *work* is doing — `working`, `blocked`, `done`, `abandoned` — and
+find out if you have just deadlocked.
+
+```
+peer_status  phase: "blocked"  blocked_on: "checkout-client"
+             summary: "waiting on the final checkout field list"
+→ published: blocked
+  DEADLOCK — you are in a mutual wait:
+  docs-writer → checkout-client → docs-writer
+  Nobody in this cycle will proceed on their own. Break it: message one of them
+  with peer_send, do the part you can without waiting, or ask your user to decide.
+```
+
+The agent registry already reports `idle`/`running`, but that describes a
+*driver*, not a task. A session is `idle` both when it has finished and when it
+is waiting on a peer — indistinguishable from outside, and the difference is
+exactly what a peer needs to decide whether to wait.
+
+This targets **FM-1.5 unaware of termination (12.4%)** and **FM-3.1 premature
+termination (6.2%)**, and is common ground in
+[Klein's sense](https://dl.acm.org/doi/abs/10.1109/MIS.2004.74) — a teammate that
+cannot signal completion or blockage cannot be coordinated with.
+
+Because `blocked` carries *who* it is blocked on, a mutual wait becomes
+representable and therefore detectable. The check runs when a session declares
+itself blocked, which is the moment a cycle can first close.
+
+### `peer_decide` and `peer_decisions`
+
+Record what was settled, so a session that starts later doesn't reopen it.
+
+```
+peer_decisions  about: "api/charges.ts"
+→ 2026-08-15 20:40 · payments-api [api/charges.ts]
+    Multi-currency is deferred until tenant billing lands; createCharge accepts
+    any currency string for now.
+    why: Validating currency needs the tenant billing profile, which does not
+         exist yet.
+    id: bd408a8e…
+```
+
+Messages are ephemeral — delivered once, folded into a transcript, gone when that
+session compacts or ends. Common ground has to outlive them, which needs a record
+rather than a conversation. This targets **FM-1.4 loss of conversation history**
+and **FM-2.1 conversation reset**.
+
+It's the [transactive-memory](https://arxiv.org/html/2606.19911v1) direction:
+rather than replicating every session's context into every other, publish the
+small durable index of *conclusions* and let peers query it by area. A directory
+covers what's beneath it, same nesting rule as claims and ownership.
+
+**Nothing is ever edited or deleted — decisions are superseded.** A later decision
+names the one it replaces; `peer_decisions` returns only what's in force, so
+nobody acts on a reversed decision, and `include_superseded` shows the history.
 
 ### `peer_inbox`
 
@@ -376,6 +448,11 @@ Three properties worth being precise about, because the setting is easy to over-
   never granted, and a lookalike name (`payments-api-staging`) does not match
   `payments-api`.
 
+`inform` is not paralysis, and the run above shows the distinction: the checkout
+session acted on the arriving message — but only after verifying the claim itself,
+and only on a file it owns and had already been asked to work on. What `inform`
+prevents is a *peer* originating authority.
+
 For work that should stay under human control, prefer `inbound: hold` — messages
 wait, and `peer_inbox` releases them when you say so.
 
@@ -391,14 +468,14 @@ npm run report -- --days 7
 
 ```
 COST — turns this plugin caused a session to spend
-  messages delivered              12
-  dropped by loop control          2
+  messages delivered               7
+  dropped by loop control          0
 CAUGHT — what would otherwise have gone wrong
-  collisions avoided               3   (a peer already held the resource)
+  collisions avoided               1   (a peer already held the resource)
   false claims caught              1   (verification refuted them)
   deadlocks detected               1
 
-12 receiver turns spent, 5 problems caught.
+7 receiver turns spent, 3 problems caught.
 ```
 
 Deliberately framed as **cost versus catch**, not usage counters: "42 messages
@@ -406,13 +483,14 @@ sent" says nothing, while "42 receiver turns spent, 6 collisions avoided" is a
 judgement you can actually make. Counts are local and aggregate — **no message
 content is stored** — and `metrics: false` turns recording off entirely.
 
-This is a command rather than an eleventh `peer_*` tool on purpose. The audience
-is you, deciding whether the plugin earns its turns; putting it in front of the
-model would take attention from the ten tools that do the work.
+This is a command rather than a tenth `peer_*` tool on purpose. The audience is
+you, deciding whether the plugin earns its turns; putting it in front of the model
+would take attention from the nine tools that do the work.
 
 The report states its own limit at the bottom, and means it: a caught collision
 is a real save, but these counts cannot tell you whether the turns spent were
-worth it.
+worth it. The one thing they demonstrably *can* do is catch a regression in what
+collaboration costs — [that is how the 20 became a 7](#what-it-cost).
 
 ## Reaching agents outside DSH
 
@@ -437,6 +515,7 @@ Two boundaries worth knowing:
   scope](https://arxiv.org/pdf/2606.31498), so an external agent is always
   `inform`, whatever `peerAuthority` says and whatever it claims about itself.
   Trust is a property of your configuration, not of a field a stranger can set.
+  Its messages carry a `from an external agent` marker on the transcript card.
 - **Outbound only.** DSH sessions can reach out; external agents cannot reach in.
   Serving an Agent Card needs an HTTP surface and its own authorization story,
   and shipping half of that would be worse than shipping none.
@@ -476,7 +555,10 @@ Override in your profile's `cordis.patch.yml`:
 | `inbound` | `accept` | `accept`, `hold` (await operator release), or `refuse` |
 | `peerAuthority` | `inform` | `act` lets authorised peers be acted on directly |
 | `trustedPeers` | `[]` | Peers authorised by `peerAuthority: act`, matched exactly |
-| `stateRoot` | `$DSH_HOME/agent-messaging` | Presence records and the offline spool |
+| `capabilities` | all on | Which optional tool groups register |
+| `groups` | `{}` | Named groups and their topology (`mesh` or `star`) |
+| `maxFanout` | `8` | Recipients one group send may reach |
+| `stateRoot` | `$DSH_HOME/agent-messaging` | Presence records, claims, cards, ledger, spool |
 | `includeSubagents` | `false` | Make subagent children addressable |
 | `spoolOffline` | `true` | Hold messages for sessions that are not running |
 | `spoolMaxAgeMs` | `86400000` | Discard a spooled message older than this |
@@ -486,6 +568,8 @@ Override in your profile's `cordis.patch.yml`:
 | `duplicateWindowMs` | `30000` | Identical bodies dropped inside this window |
 | `maxHeld` | `100` | Held messages retained per session |
 | `deliveryTimeoutMs` | `5000` | Wait for a peer host's receipt |
+| `metrics` | `true` | Record the cost/catch counts `npm run report` reads |
+| `a2aEndpoints` | `{}` | External Agent2Agent peers |
 
 To stop receiving entirely, set `inbound: refuse`. To stop sending, deny the tools in
 your permission rules.
@@ -497,14 +581,17 @@ distinction survives contact.
 
 - **Inbound messages are framed as untrusted.** Every delivery carries a fixed warning
   describing what the block is and what it cannot do. This follows the convention the
-  harness established for cross-session references.
+  harness established for cross-session references. The transcript card is a
+  presentation of that message, never a replacement: the harness's own context row
+  stays beneath it holding the exact bytes the model read.
 - **A body cannot forge its own frame.** The data region is JSON with every `<` emitted
   as its lossless JSON unicode escape, so no peer-supplied string can spell the
   surrounding tags and escape into the instruction area.
 - **Senders cannot be impersonated.** Identity is read from the executing agent, never
   from tool arguments.
 - **Loop control terminates runaways.** Per-sender rate limiting and duplicate
-  suppression mean two agents that answer each other automatically stop on their own.
+  suppression mean two agents that answer each other automatically stop on their own —
+  which is not theoretical: it is what ended the courtesy loop measured above.
 - **The inbox is owner-only.** The socket is `chmod 0600`; on a shared machine another
   user's processes cannot reach it.
 - **Wire input is validated before it reaches policy.** Unknown protocol versions,
@@ -522,6 +609,10 @@ prompt, and anything it asks for is still subject to the receiving session's own
 - **Spooled messages are best-effort.** They expire, and the deepest are dropped first.
 - **Presence is advisory.** A host that dies between publishing and delivery makes a
   session look reachable until the record is pruned.
+- **Tool-call cards are not rendered.** Every tool declares
+  `presentCall`/`presentResult`, the harness's documented presentation vocabulary, but
+  the Web UI still draws the generic row against the `rc` builds this was developed on.
+  The declarations cost nothing to carry; make no plans around them.
 - **The harness is a developer preview** with no compatibility promise. This builds
   against the npm `rc` line; service keys have been renamed between releases before, so
   re-verify after a harness upgrade.
@@ -530,7 +621,7 @@ prompt, and anything it asks for is still subject to the receiving session's own
 
 ```bash
 npm install
-npm run verify   # typecheck, tests, build
+npm run verify   # typecheck (host + browser), tests, build
 ```
 
 The layering keeps policy testable without a running harness: `src/domain` is pure and
@@ -538,31 +629,24 @@ imports no framework, `src/app` holds the use cases behind the interfaces in
 `src/ports`, and `src/adapters` binds those to Cordis, the agent registry, sockets and
 disk.
 
-`src/client` is the browser half, built separately (`lib/client.js`, its own
-tsconfig, DOM and JSX instead of Node) and served by the harness to the Web UI.
-Its projection and formatting are pure functions, so the transcript card is
-tested here rather than in a browser; the round trip that matters — the record
-the host writes, read back by the card — is pinned in `tests/agent-sink.test.ts`.
+`src/client` is the browser half — the transcript card — built separately
+(`lib/client.js`, its own tsconfig, DOM and JSX instead of Node) and served by the
+harness to the Web UI. Its projection and formatting are pure functions, so the
+card is tested here rather than in a browser.
 
-`tests/scenario.integration.test.ts` is the one that proves the README's actual
-claim. It runs a three-session team through a breaking contract change on the real
-stack — real stores, real sockets, real loop control, real accounting — and pins
-the exact numbers that come out:
+**367 tests.** Three of them carry more weight than the rest:
 
-```
-3 receiver turns spent, 3 problems caught
-  collisions avoided   1   checkout stopped from duplicating a claimed file
-  false claims caught  1   a currency claim refuted before it was acted on
-  deadlocks detected   1   docs and checkout waiting on each other
-```
-
-It also pins the guarantee the admission design rests on: a `refuse` policy holds
-whether a message arrives in-process or over a socket. If a change makes
-collaboration quieter or noisier, those numbers move and the test says so.
+- `tests/scenario.integration.test.ts` runs a three-session team through a breaking
+  contract change on the real stack — real stores, real sockets, real loop control,
+  real accounting — and pins the exact numbers that come out. If a change makes
+  collaboration quieter or noisier, those numbers move and the test says so.
+- `tests/agent-sink.test.ts` reads the record the host writes back through the card's
+  own reader, so the two halves of the plugin cannot drift apart quietly.
+- `tests/tool-guidance.test.ts` pins the sentences in tool descriptions that a live
+  run proved load-bearing — including the one that cut message traffic by 65%.
 
 Transport, presence and spool tests run against real Unix sockets and real files rather
-than mocks. `tests/collaboration-scenario.test.ts` drives the handoff shown above end
-to end.
+than mocks.
 
 [`docs/design.md`](docs/design.md) covers why each seam is where it is, and which
 alternatives were rejected. [`docs/roadmap.md`](docs/roadmap.md) is the research
