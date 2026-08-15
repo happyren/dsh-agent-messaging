@@ -16,6 +16,7 @@ import { MessageSender, type SenderIdentity } from './app/send-message.ts'
 import { AgentInboxSink } from './adapters/agent-sink.ts'
 import { CardStore } from './adapters/cards.ts'
 import { ClaimStore } from './adapters/claims.ts'
+import { DecisionStore } from './adapters/decisions.ts'
 import { TaskStateStore } from './adapters/task-states.ts'
 import { SessionQueryPeerDirectory } from './adapters/directory.ts'
 import { PresenceStore, socketPathFor } from './adapters/presence.ts'
@@ -29,6 +30,7 @@ import { LoopGuard } from './domain/policy.ts'
 import { PLUGIN_NAME } from './plugin-name.ts'
 import { createPeerCardTool } from './tools/peer-card.ts'
 import { createPeerClaimTool } from './tools/peer-claim.ts'
+import { createPeerDecideTool, createPeerDecisionsTool } from './tools/peer-decisions.ts'
 import { createPeerInboxTool } from './tools/peer-inbox.ts'
 import { createPeerListTool } from './tools/peer-list.ts'
 import { createPeerSendTool } from './tools/peer-send.ts'
@@ -114,6 +116,7 @@ export function apply(ctx: Context, config: Config): void {
 
   const cards = new CardStore({ stateRoot, logger })
   const taskStates = new TaskStateStore({ stateRoot, logger })
+  const decisions = new DecisionStore({ stateRoot, logger })
 
   /**
    * Resolve this session's own peer identity from the shared directory, so the
@@ -150,6 +153,8 @@ export function apply(ctx: Context, config: Config): void {
       ctx.tools.register(createPeerVerifyReplyTool(sender, identify)),
       ctx.tools.register(createPeerCardTool(cards)),
       ctx.tools.register(createPeerStatusTool(taskStates, identify, resolveSessionId)),
+      ctx.tools.register(createPeerDecideTool(decisions, identify, systemClock, uuidIdFactory)),
+      ctx.tools.register(createPeerDecisionsTool(decisions)),
     ]
     return () => {
       for (const dispose of disposers) dispose()

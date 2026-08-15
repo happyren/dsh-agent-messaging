@@ -136,6 +136,33 @@ delivered when it next starts, within the configured age and depth bounds.
 Replies correlate through `reply_to`, and the receiver is told to answer the sender's
 session id rather than its display name, which can change when a title is refolded.
 
+### `peer_decide` and `peer_decisions`
+
+Record what was settled, so a session that starts later doesn't reopen it.
+
+```
+peer_decisions  about: "api/charges.ts"
+→ 2026-08-14 13:58 · record-billing-decisions [api/charges.ts]
+    currency stays hardcoded to "usd" for now; multi-currency deferred until
+    billing supports it
+    why: billing does not support multi-currency yet
+    id: 4f2a…
+```
+
+Messages are ephemeral — delivered once, folded into a transcript, gone when that
+session compacts or ends. Common ground has to outlive them, which needs a record
+rather than a conversation. This targets **FM-1.4 loss of conversation history**
+and **FM-2.1 conversation reset**.
+
+It's the [transactive-memory](https://arxiv.org/html/2606.19911v1) direction:
+rather than replicating every session's context into every other, publish the
+small durable index of *conclusions* and let peers query it by area. A directory
+covers what's beneath it, same nesting rule as claims and ownership.
+
+**Nothing is ever edited or deleted — decisions are superseded.** A later decision
+names the one it replaces; `peer_decisions` returns only what's in force, so
+nobody acts on a reversed decision, and `include_superseded` shows the history.
+
 ### `peer_status`
 
 Say what your *work* is doing — `working`, `blocked`, `done`, `abandoned` — and

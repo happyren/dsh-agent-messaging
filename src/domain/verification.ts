@@ -17,25 +17,15 @@
  */
 
 import { PeerError } from './errors.ts'
+import { normalizeEvidence, renderEvidence, type Evidence } from './evidence.ts'
+
+export type { Evidence } from './evidence.ts'
 
 /** Longest accepted claim statement. */
 const MAX_CLAIM_CHARS = 1_000
 
 /** Longest accepted verdict rationale. */
 const MAX_RATIONALE_CHARS = 2_000
-
-/** Most evidence pointers one request may carry. */
-const MAX_EVIDENCE = 10
-
-/** Where a verifier should look to check a claim. */
-export interface Evidence {
-  /** A workspace-relative path, commit sha, command, or URL. */
-  readonly locator: string
-  /** Optional line or range within a file, as written by the claimer. */
-  readonly at?: string
-  /** Why this is relevant to the claim. */
-  readonly note?: string
-}
 
 /** What the verifier concluded. */
 export type Verdict =
@@ -75,22 +65,6 @@ function requireText(value: string, max: number, what: string): string {
     throw new PeerError('invalid-body', `A verification ${what} exceeds ${max} characters.`)
   }
   return trimmed
-}
-
-function normalizeEvidence(evidence: readonly Evidence[]): readonly Evidence[] {
-  if (evidence.length > MAX_EVIDENCE) {
-    throw new PeerError('invalid-body', `At most ${MAX_EVIDENCE} evidence pointers are accepted.`)
-  }
-  return Object.freeze(
-    evidence.map((item) => {
-      const locator = requireText(item.locator, 512, 'evidence locator')
-      return Object.freeze({
-        locator,
-        ...(item.at?.trim() ? { at: item.at.trim() } : {}),
-        ...(item.note?.trim() ? { note: item.note.trim() } : {}),
-      })
-    }),
-  )
 }
 
 /**
@@ -151,12 +125,7 @@ export function renderRequest(request: VerificationRequest): string {
   ]
 
   if (request.evidence.length > 0) {
-    lines.push('', 'Where to look:')
-    for (const item of request.evidence) {
-      const at = item.at ? `:${item.at}` : ''
-      const note = item.note ? ` — ${item.note}` : ''
-      lines.push(`  - ${item.locator}${at}${note}`)
-    }
+    lines.push('', 'Where to look:', ...renderEvidence(request.evidence))
   }
 
   lines.push(
@@ -182,12 +151,7 @@ export function renderVerdict(verdict: VerificationVerdict): string {
     verdict.rationale,
   ]
   if (verdict.evidence.length > 0) {
-    lines.push('', 'Checked:')
-    for (const item of verdict.evidence) {
-      const at = item.at ? `:${item.at}` : ''
-      const note = item.note ? ` — ${item.note}` : ''
-      lines.push(`  - ${item.locator}${at}${note}`)
-    }
+    lines.push('', 'Checked:', ...renderEvidence(verdict.evidence))
   }
   if (verdict.verdict === 'refuted') {
     lines.push('', 'Your claim did not survive checking. Re-examine it before acting on it.')
