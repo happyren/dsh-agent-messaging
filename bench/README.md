@@ -58,11 +58,18 @@ plugin in its bundle list:
 }
 ```
 
-## Isolation is a precondition, not a nicety
+## Isolation is a precondition, and the runner enforces it
 
 **The workspace must contain nothing but the benchmark.** Peers are discovered
-from the session corpus, so every session already in that workspace is
-addressable by every scenario.
+from the session corpus, so every session in that workspace is addressable by
+every scenario.
+
+The runner enforces this rather than trusting it. For the length of a run the
+harness's workspace registry is replaced with one containing only the benchmark
+workspace, and restored afterwards; sessions the benchmark creates are deleted
+between scenarios. **Your own sessions are never touched** — only the registry
+entry is swapped, never the corpus behind it — but the registry is real state, so
+do not run this against a harness you are also using.
 
 This is not a theoretical concern. The first result this benchmark produced was
 invalid because of it. In the `plugin` arm of `stale-contract`, the client
@@ -92,8 +99,10 @@ at a directory of its own.
   it. Repeat runs and report the spread before drawing conclusions.
 - **Model-dependent.** Every number is specific to the model that produced it.
   Record which one.
-- **The workspace must be pre-registered.** The runner cannot add one: that flow
-  ends in a native directory picker.
+- **The workspace must be pre-registered once.** The runner can isolate the
+  registry but cannot add a workspace to it: that flow ends in a native directory
+  picker. Add the benchmark directory through the UI once, then never open it by
+  hand again.
 - **`mutual-wait` scores movement, not insight.** It asks whether anybody broke
   the wait, which a session can do by ignoring the instruction as easily as by
   detecting the cycle. It is the weakest oracle here.
@@ -106,7 +115,9 @@ at a directory of its own.
   so any arm can be scored from a checkout.
 - `score.mjs` — summarizing and the comparison table.
 - `run.mjs` — the live runner: one harness process per scenario, one browser
-  context per session.
+  context per session, registry isolated for the duration.
+- `compare.mjs` — lays result files side by side, including ones produced
+  elsewhere (`--markdown` for a table to paste).
 - `results/` — what each arm actually did, including the transcripts a verdict
   was drawn from.
 - `../tests/bench-score.test.ts` — the oracles are unit-tested against
