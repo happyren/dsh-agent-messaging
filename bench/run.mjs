@@ -189,7 +189,7 @@ async function startHost({ profile, port, cwd }) {
 }
 
 /** Drive one scenario's sessions and report the turns each spent. */
-async function driveSessions({ chromium, port, prompts, workspace }) {
+async function driveSessions({ chromium, port, prompts, workspace, concurrent }) {
   const browser = await chromium.launch({ headless: true })
   const turns = {}
   try {
@@ -249,16 +249,26 @@ async function driveSessions({ chromium, port, prompts, workspace }) {
       await page.waitForTimeout(250)
       await page.keyboard.press('Enter')
 
-      let started = false
-      for (let i = 0; i < TURN_TIMEOUT_S; i += 1) {
-        await page.waitForTimeout(1000)
-        const running = await page.evaluate(() =>
-          Boolean(document.querySelector('button[aria-label*="Stop" i]')),
-        )
-        if (running) started = true
-        else if (started && i > 2) break
+      // Submitting is what claims the reusable blank session, so prompts are
+      // always submitted one at a time. Whether the runner then WAITS is the
+      // scenario's call: a collision and a mutual wait only exist while two
+      // sessions overlap in time, and serialising them scored two of five
+      // scenarios as passes for the baseline — which means they measured
+      // nothing at all.
+      if (concurrent === true) {
+        await page.waitForTimeout(2500)
+      } else {
+        let started = false
+        for (let i = 0; i < TURN_TIMEOUT_S; i += 1) {
+          await page.waitForTimeout(1000)
+          const running = await page.evaluate(() =>
+            Boolean(document.querySelector('button[aria-label*="Stop" i]')),
+          )
+          if (running) started = true
+          else if (started && i > 2) break
+        }
+        await page.waitForTimeout(2000)
       }
-      await page.waitForTimeout(2000)
       turns[label] = { page, context }
     }
 
@@ -360,6 +370,7 @@ for (const scenario of chosen) {
       port: args.port,
       prompts: scenario.sessions,
       workspace: basename(root),
+      concurrent: scenario.concurrent === true,
     })
   } finally {
     host.kill()
@@ -383,8 +394,22 @@ for (const scenario of chosen) {
   await restoreRegistry()
 }
 
-const summary = summarize(runs)
+// A partial re-run replaces the scenarios it ran and leaves the rest alone:
+// scenarios get fixed one at a time, and re-running the whole matrix to correct
+// one of them costs an hour of model time for no new information.
 const out = join(dirname(new URL(import.meta.url).pathname), 'results', `${args.arm}.json`)
+let previous = []
+try {
+  previous = JSON.parse(await readFile(out, 'utf8')).rows ?? []
+} catch {
+  // First run for this arm.
+}
+const replaced = new Set(runs.map((run) => run.id))
+const merged = [...previous.filter((row) => !replaced.has(row.id)), ...runs]
+const order = SCENARIOS.map((entry) => entry.id)
+merged.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+
+const summary = summarize(merged)
 await mkdir(dirname(out), { recursive: true })
 await writeFile(out, `${JSON.stringify({ arm: args.arm, profile: args.profile, ...summary }, null, 2)}\n`)
 

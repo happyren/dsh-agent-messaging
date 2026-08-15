@@ -91,6 +91,13 @@ export const SCENARIOS = [
   {
     id: 'collision',
     title: 'Two sessions edit one file',
+    /**
+     * Both prompts are dispatched before either finishes. A lost update needs
+     * the sessions to overlap in time; run one after the other and the second
+     * simply reads what the first wrote, which is how this scenario first
+     * scored a pass for the uncoordinated baseline and measured nothing.
+     */
+    concurrent: true,
     /** FM-1.3 step repetition — 15.7% of observed multi-agent failures. */
     fixture: CHARGES_FIXTURE,
     sessions: {
@@ -138,6 +145,8 @@ export const SCENARIOS = [
   {
     id: 'mutual-wait',
     title: 'Both sessions wait for the other',
+    /** Nobody can wait for a session that has not started yet. */
+    concurrent: true,
     /** FM-1.5 unaware of termination, 12.4%; FM-3.1 premature termination, 6.2%. */
     fixture: CHARGES_FIXTURE,
     sessions: {

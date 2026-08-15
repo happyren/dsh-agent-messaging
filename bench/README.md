@@ -93,6 +93,26 @@ problem for the plugin to solve rather than a problem for the benchmark to avoid
 Use a workspace you keep for the benchmark and nothing else, or point `DSH_HOME`
 at a directory of its own.
 
+## What the first full matrix found
+
+Two of five scenarios were broken, and the baseline is what exposed them.
+
+`collision` and `mutual-wait` both **passed** uncoordinated — which by the rule
+above means they measured nothing. The cause was in the runner, not the
+scenarios: prompts were dispatched one at a time, each waiting for the previous
+session to finish. A lost update and a mutual wait only exist while two sessions
+are live at once. Run them in sequence and the second session simply reads what
+the first wrote, and neither can wait for a peer that has not started.
+
+Fixed by splitting *submitting* a prompt from *waiting* for it: submission stays
+sequential, because that is what claims a blank session, but a scenario marked
+`concurrent: true` moves straight to the next session instead of waiting. Those
+two are re-run; the other three were unaffected and were not.
+
+Worth stating plainly: a benchmark author's own scenarios are the first thing a
+control catches, and both of these looked completely reasonable until a run said
+otherwise.
+
 ## Known limits
 
 - **Small n.** One run per arm per scenario is an anecdote with a table around

@@ -103,6 +103,16 @@ describe('scenario oracles', () => {
     expect(scenario('stale-decision').score({ files }).verdict).toBe('pass')
   })
 
+  it('dispatches concurrently exactly where the failure needs overlapping sessions', () => {
+    // A lost update and a mutual wait only exist while two sessions are live at
+    // once. Run serially and the baseline passes both, which means neither is
+    // measuring anything — that is how they were caught.
+    const concurrent = SCENARIOS.filter((entry: { concurrent?: boolean }) => entry.concurrent === true).map(
+      (entry: { id: string }) => entry.id,
+    )
+    expect(concurrent.sort()).toEqual(['collision', 'mutual-wait'])
+  })
+
   it('gives every scenario a fixture, prompts for at least two sessions, and an oracle', () => {
     for (const entry of SCENARIOS) {
       expect(Object.keys(entry.fixture).length, entry.id).toBeGreaterThan(0)

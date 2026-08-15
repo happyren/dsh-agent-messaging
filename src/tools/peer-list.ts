@@ -11,13 +11,24 @@ import type { TaskStateStore } from '../adapters/task-states.ts'
 import type { WorkClaims } from '../app/claim-work.ts'
 import type { MessageSender } from '../app/send-message.ts'
 import { summarizeCard } from '../domain/card.ts'
-import { peerAddress, type PeerDescriptor } from '../domain/peer.ts'
+import { describeAge, peerAddress, type PeerDescriptor } from '../domain/peer.ts'
 import { summarizeTaskState } from '../domain/task-state.ts'
 import { presentListCall } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 
-/** Reachability as the model should reason about it. */
-function reachability(peer: PeerDescriptor): string {
+/**
+ * Reachability as the model should reason about it.
+ *
+ * A session that is not running carries its age, because the benchmark caught a
+ * session deferring work to peers that had been dead for hours: it read their
+ * titles, concluded the job was theirs, and left a call site broken. A stopped
+ * session and a colleague looked identical in the listing, and a title is a
+ * strong, unreliable signal.
+ * @param peer - the peer to describe.
+ * @param now - the current time, supplied so a listing is testable.
+ * @returns the state, with an age for anything that is not running.
+ */
+function reachability(peer: PeerDescriptor, now: number): string {
   switch (peer.location.kind) {
     case 'local':
       return peer.status === 'running' ? 'running' : 'idle'
@@ -26,7 +37,7 @@ function reachability(peer: PeerDescriptor): string {
     case 'a2a':
       return 'external agent (A2A)'
     case 'offline':
-      return 'not running'
+      return `not running, started ${describeAge(Math.max(0, now - peer.createdAt))}`
   }
 }
 
@@ -53,6 +64,8 @@ export function createPeerListTool(
       'or when an address was ambiguous. Sessions marked "not running" can still be sent to:',
       'the message is queued and delivered when that session next starts.',
       'This returns only session identities — never their conversation contents.',
+      'A session marked "not running" is not working on anything: do not conclude that a task belongs to one',
+      'because its title mentions that task. If work needs doing and nobody live owns it, it is yours or your user\'s.',
     ].join(' '),
     parameters: {},
     output: {
@@ -149,13 +162,14 @@ export function createPeerListTool(
       }
 
       return peers.map((peer) => {
-        const working = byHolder.get(peer.sessionId) ?? []
+        const now = Date.now()
+      const working = byHolder.get(peer.sessionId) ?? []
         const card = cardBySession.get(peer.sessionId)
         const task = stateBySession.get(peer.sessionId)
         return {
           name: peerAddress(peer),
           session_id: peer.sessionId,
-          state: reachability(peer),
+          state: reachability(peer, now),
           ...(peer.title === undefined ? {} : { title: peer.title }),
           ...(peer.cwd === undefined ? {} : { cwd: peer.cwd }),
           ...(task === undefined
