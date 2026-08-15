@@ -278,7 +278,11 @@ than mocks. `tests/collaboration-scenario.test.ts` drives the handoff shown abov
 to end.
 
 [`docs/design.md`](docs/design.md) covers why each seam is where it is, and which
-alternatives were rejected.
+alternatives were rejected. [`docs/roadmap.md`](docs/roadmap.md) is the research
+note behind what gets built next: what the multi-agent literature actually shows
+(including that agent debate usually *loses* at equal token budget), which
+measured failure modes each planned feature attacks, and what is deliberately not
+being built.
 
 ## Contributing
 
