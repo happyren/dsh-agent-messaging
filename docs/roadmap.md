@@ -163,7 +163,16 @@ reset**. Messages are ephemeral; common ground has to outlive them. Follows the
 who knows what rather than replicating everyone's full memory
 ([MATM][matm], [memory survey][mem-survey]).
 
-### v0.4.0 — Groups and topology control
+### v0.4.0 — Collaboration accounting  ✅ shipped
+
+Turns caused by inbound messages, how many were acted on, duplicate work avoided.
+
+Without this, nobody — including us — can tell whether any of the above helps.
+Anthropic's 15× token result is the cautionary tale: collaboration is expensive,
+and it was only known to be worthwhile because it was measured
+([writeup][anthropic]).
+
+### Not built: groups and topology control
 
 Named channels with an explicit shape: star through a lead, or mesh.
 
@@ -171,7 +180,7 @@ Communication topology measurably changes both efficiency and quality, and
 denser is not automatically better ([topology study][topology]). Making the shape
 explicit beats an implicit all-to-all that degrades as sessions multiply.
 
-### v0.5.0 — A2A bridge
+### Not built: an A2A bridge
 
 Speak [Agent2Agent][a2a] so DSH sessions can reach agents outside DSH.
 
@@ -185,14 +194,23 @@ Worth stating the known gap: these protocols still cannot express governance
 constraints such as authority scope ([governance analysis][governance]) — which
 is precisely what `peerAuthority` exists to keep outside the wire.
 
-### v0.4.0 — Collaboration accounting  ✅ shipped
+## Where this stops
 
-Turns caused by inbound messages, how many were acted on, duplicate work avoided.
+Six of the eight items above shipped, each with a live pass in a real host. The
+two that did not are recorded above as *not built* rather than as *next*, because
+neither is a commitment.
 
-Without this, nobody — including us — can tell whether any of the above helps.
-Anthropic's 15× token result is the cautionary tale: collaboration is expensive,
-and it was only known to be worthwhile because it was measured
-([writeup][anthropic]).
+The honest reason to stop here is that both **add surface**, and the last thing
+this plugin needs is more of it. Ten `peer_*` tools already compete for a model's
+attention against everything else in the harness, and nothing measures whether a
+model reaches for the right one under load. Groups would add more tools; the A2A
+bridge would add a second protocol whose
+[governance model does not yet express](https://arxiv.org/pdf/2606.31498) the
+authority boundary `peerAuthority` exists to hold.
+
+The accounting in `v0.4.0` is what should decide whether either is worth
+building: run the plugin on real work, read `npm run report`, and let the numbers
+argue. That is the point of having measured anything at all.
 
 ## Deliberately not building
 
