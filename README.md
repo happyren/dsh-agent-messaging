@@ -535,6 +535,36 @@ is a real save, but these counts cannot tell you whether the turns spent were
 worth it. The one thing they demonstrably *can* do is catch a regression in what
 collaboration costs — [that is how the 20 became a 7](#what-it-cost).
 
+## The benchmark
+
+The claim this project makes — coordination costs turns and saves more than it
+costs — was argued from runs whose scoring I wrote. [`bench/`](bench/) replaces
+that with something falsifiable: five scenarios an uncoordinated pair gets wrong,
+scored on **whether the repository ended up correct**, priced in model turns.
+
+```bash
+node bench/run.mjs --arm baseline --profile bench-baseline --workspace ~/dsh-bench
+node bench/run.mjs --arm plugin   --profile web --workspace ~/dsh-bench
+```
+
+An oracle reads the files on disk and nothing else. No credit for sending a
+message, taking a claim, or returning a verdict — coordination that does not
+change the outcome is pure cost. An arm is chosen by *profile*, so this plugin, a
+competing one, and no coordination at all are measured identically.
+
+**The first run came back invalid, and that is in the repository too.** In the
+plugin arm the client session read the ledger, found the requirement — the
+coordination worked — and then decided the fix belonged to a session it had seen
+in `peer_list`, which was a corpse from an earlier run. What got measured was my
+untidy workspace. The result is kept with that explanation rather than deleted,
+the methodology now states isolation as a precondition, and the underlying
+finding — [stale peers invite diffusion of
+responsibility](docs/roadmap.md#found-by-the-benchmark-stale-peers-diffuse-responsibility)
+— is on the roadmap as the plugin's problem to solve.
+
+Read [`bench/README.md`](bench/README.md) before quoting any number from it,
+including mine.
+
 ## Reaching agents outside DSH
 
 Configure an [Agent2Agent](https://en.wikipedia.org/wiki/Agent2Agent) endpoint and
