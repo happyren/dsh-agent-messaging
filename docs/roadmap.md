@@ -93,7 +93,7 @@ second, and the roadmap should not drift back into the first.
 Ordered by impact-significance: the failure mass each item removes, weighted by
 the evidence behind it.
 
-### v0.0.3 — Work claims
+### v0.0.3 — Work claims  ✅ shipped
 
 Advisory claims on a path or topic, with a TTL, visible to every peer.
 

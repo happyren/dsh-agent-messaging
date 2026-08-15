@@ -10,9 +10,11 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 
+import { WorkClaims } from './app/claim-work.ts'
 import { InboundRouter } from './app/receive-message.ts'
 import { MessageSender, type SenderIdentity } from './app/send-message.ts'
 import { AgentInboxSink } from './adapters/agent-sink.ts'
+import { ClaimStore } from './adapters/claims.ts'
 import { SessionQueryPeerDirectory } from './adapters/directory.ts'
 import { PresenceStore, socketPathFor } from './adapters/presence.ts'
 import { FileOutboxSpool } from './adapters/spool.ts'
@@ -23,6 +25,7 @@ import { InboxServer } from './adapters/transport/inbox-server.ts'
 import { RoutingTransport } from './adapters/transport/routing-transport.ts'
 import { LoopGuard } from './domain/policy.ts'
 import { PLUGIN_NAME } from './plugin-name.ts'
+import { createPeerClaimTool } from './tools/peer-claim.ts'
 import { createPeerInboxTool } from './tools/peer-inbox.ts'
 import { createPeerListTool } from './tools/peer-list.ts'
 import { createPeerSendTool } from './tools/peer-send.ts'
@@ -99,6 +102,11 @@ export function apply(ctx: Context, config: Config): void {
     ids: uuidIdFactory,
   })
 
+  const claims = new WorkClaims({
+    repository: new ClaimStore({ stateRoot, logger }),
+    clock: systemClock,
+  })
+
   /**
    * Resolve this session's own peer identity from the shared directory, so the
    * name a sender stamps on a message is the same name the recipient would see
@@ -115,13 +123,14 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   ctx.effect(() => {
-    const disposeList = ctx.tools.register(createPeerListTool(sender))
-    const disposeSend = ctx.tools.register(createPeerSendTool(sender, identify))
-    const disposeInbox = ctx.tools.register(createPeerInboxTool(inbound))
+    const disposers = [
+      ctx.tools.register(createPeerListTool(sender, claims)),
+      ctx.tools.register(createPeerSendTool(sender, identify)),
+      ctx.tools.register(createPeerInboxTool(inbound)),
+      ctx.tools.register(createPeerClaimTool(claims, identify)),
+    ]
     return () => {
-      disposeList()
-      disposeSend()
-      disposeInbox()
+      for (const dispose of disposers) dispose()
     }
   }, 'dsh-agent-messaging:tools')
 
@@ -136,7 +145,16 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   ctx.on('agent/created', () => republish())
-  ctx.on('agent/disposed', () => republish())
+
+  // A departing session's claims must not outlive it, or peers keep deferring to
+  // a holder that is gone. Expiry would eventually clear them, but a whole TTL of
+  // false conflicts is exactly the duplicated-work stall claims exist to prevent.
+  ctx.on('agent/disposed', ({ agent }) => {
+    republish()
+    void claims.withdrawAll(agent.id).catch((error: unknown) => {
+      logger.warn(`could not release claims for ${agent.id}: ${describe(error)}`)
+    })
+  })
 
   // Spooled messages are released at `agent/session-start`, not `agent/created`:
   // creation is composition-only, and this is the first point the harness
