@@ -142,7 +142,7 @@ Attacks **FM-1.2 disobey role specification** and **FM-2.3 task derailment**
 Shaped after [A2A][a2a] Agent Cards, so the same declaration can later serve
 cross-vendor discovery.
 
-### v0.2.0 — Task-state signalling
+### v0.2.0 — Task-state signalling  ✅ shipped
 
 Report *task* state — working, blocked-on-peer, done, abandoned — rather than
 only the process state (`idle`/`running`) the agent registry exposes.
