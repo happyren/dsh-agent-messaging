@@ -12,6 +12,7 @@ import type { TaskStateStore } from '../adapters/task-states.ts'
 import { explainSendFailure } from '../app/send-message.ts'
 import { createTaskState, findWaitCycle, TASK_PHASES, type TaskPhase } from '../domain/task-state.ts'
 import { noMetrics, type MetricsSink } from '../ports/index.ts'
+import { presentStatusCall, presentStatusResult } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
 
@@ -99,6 +100,8 @@ export function createPeerStatusTool(
         ]
       },
     },
+    presentCall: (args) => presentStatusCall(args),
+    presentResult: (args, result) => presentStatusResult(args, result),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       try {

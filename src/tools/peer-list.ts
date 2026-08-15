@@ -11,6 +11,7 @@ import type { MessageSender } from '../app/send-message.ts'
 import { summarizeCard } from '../domain/card.ts'
 import type { PeerDescriptor } from '../domain/peer.ts'
 import { summarizeTaskState } from '../domain/task-state.ts'
+import { presentListCall } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 
 /** Reachability as the model should reason about it. */
@@ -102,6 +103,7 @@ export function createPeerListTool(
         },
       ],
     },
+    presentCall: () => presentListCall(),
     async execute(_args, exec) {
       const self = requireCallerSessionId(exec)
       const [peers, held, published, declared] = await Promise.all([

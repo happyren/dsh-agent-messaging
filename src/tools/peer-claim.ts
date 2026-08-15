@@ -8,6 +8,7 @@ import type { WorkClaims } from '../app/claim-work.ts'
 import type { ClaimScope } from '../domain/claim.ts'
 import { explainSendFailure } from '../app/send-message.ts'
 import type { SenderIdentityResolver } from './peer-send.ts'
+import { presentClaimCall, presentClaimResult } from './presentation.ts'
 import { requireCallerSessionId } from './caller.ts'
 
 /** Minutes a claim lasts when the caller does not say. */
@@ -120,6 +121,8 @@ export function createPeerClaimTool(
         ]
       },
     },
+    presentCall: (args) => presentClaimCall(args),
+    presentResult: (args, result) => presentClaimResult(args, result),
     async execute(args, exec) {
       const selfSessionId = requireCallerSessionId(exec)
       const scope = (args.scope ?? 'path') as ClaimScope

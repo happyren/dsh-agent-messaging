@@ -212,6 +212,25 @@ The accounting in `v0.4.0` is what should decide whether either is worth
 building: run the plugin on real work, read `npm run report`, and let the numbers
 argue. That is the point of having measured anything at all.
 
+## Known limit: custom rendering
+
+Tool calls declare `presentCall`/`presentResult` — the harness's documented
+presentation vocabulary, used by first-party tools — so a card can carry the
+verdict, the refusal, or the deadlock in its title instead of a bare
+`peer_claim · api/charges.ts` row.
+
+**Verified as not yet visible.** Against the `rc` build these were developed on,
+the Web UI renders the generic row regardless, and a presenter title does not
+appear in either the row or the detail panel. The declarations are correct
+against the published types and cost nothing to carry, so they stay — but nobody
+should read this as a UI improvement until a harness build renders them.
+
+Genuinely custom rendering — an inbound peer message as a real card rather than a
+`Context injection` row — needs a **client bundle**: a Conversation Node that
+folds the events, a keyed renderer registered against `conversation.chat.node`,
+CSS modules, and the client/host tsconfig split. That is a substantially larger
+piece of work than anything in this roadmap, and it is not started.
+
 ## Deliberately not building
 
 - **Debate or voting among peers.** The evidence is against it at equal budget,
