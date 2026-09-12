@@ -11,8 +11,10 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-// Loaded for its Context augmentations: `slots` and `conversationEvents`.
-import type {} from '@deepseek-ai/dsh-client-runtime/client'
+// Loaded for its Context augmentation: `slots`.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// Loaded for its Context augmentation: `uiConversation`.
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Loaded for its Context augmentation: `locale`.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 
@@ -22,7 +24,7 @@ import { LOCALE_NS, en, zh } from './locales.ts'
 import { installStyles } from './styles.ts'
 
 /** Services this half needs: the projection registry, the slot registry, and the copy. */
-export const inject = ['conversationEvents', 'slots', 'locale']
+export const inject = ['uiConversation', 'slots', 'locale']
 
 /**
  * Register the peer-message row.
@@ -32,7 +34,7 @@ export function apply(ctx: Context): void {
   installStyles()
 
   ctx.effect(
-    () => ctx.conversationEvents.register(agentMessageDefinition),
+    () => ctx.uiConversation.events.register(agentMessageDefinition),
     'agent-messaging: peer message projection',
   )
   ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh, en }), 'agent-messaging: dictionaries')

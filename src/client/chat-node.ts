@@ -12,13 +12,13 @@
  * projection testable without a browser.
  */
 
-import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {
   ConversationMatch,
   ConversationMatchResult,
   ConversationNodeContext,
   ConversationNodeDefinition,
-} from '@deepseek-ai/dsh-client-runtime/client'
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 import { readPeerBody, readPeerMessage, type PeerMessage } from './peer-message.ts'
 
@@ -61,7 +61,7 @@ export interface AgentMessageChatData {
   readonly raw: boolean
 }
 
-declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
+declare module '@deepseek-ai/dsh-client-ui-chat/client' {
   interface ChatNodeDataMap {
     /** One message another agent session addressed to this one. */
     'agent-message': AgentMessageChatData
@@ -130,7 +130,7 @@ export const agentMessageDefinition: ConversationNodeDefinition<AgentMessageChat
     return context.state
   },
 
-  buildViewNode(context: ConversationNodeContext<AgentMessageChatData>): ChatNode<'agent-message'> | null {
+  buildViewNode(context: ConversationNodeContext<AgentMessageChatData>): ChatConversationViewNode | null {
     const state = context.state
     if (state === undefined) return null
     return {

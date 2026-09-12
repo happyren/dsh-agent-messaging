@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-messaging",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Cross-session agent-to-agent messaging for DeepSeek Harness: claims, verification and a decision ledger, so two agent sessions don't repeat, contradict or deadlock each other.",
   "keywords": [
     "dsh",
@@ -52,9 +52,10 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-renderer"
       ]
     }
   },
@@ -76,8 +77,9 @@
     "@deepseek-ai/cordis": "^4.0.0",
     "@deepseek-ai/dsh-agent": "*",
     "@deepseek-ai/dsh-client-locale": "*",
-    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-client-ui-chat": "*",
     "@deepseek-ai/dsh-client-ui-conversation": "*",
+    "@deepseek-ai/dsh-client-ui-renderer": "*",
     "@deepseek-ai/dsh-client-ui-slots": "*",
     "@deepseek-ai/dsh-llm": "*",
     "@deepseek-ai/dsh-session": "*",
@@ -89,10 +91,13 @@
     "@deepseek-ai/dsh-client-locale": {
       "optional": true
     },
-    "@deepseek-ai/dsh-client-runtime": {
+    "@deepseek-ai/dsh-client-ui-chat": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-conversation": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-renderer": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-slots": {
@@ -104,10 +109,11 @@
     "@deepseek-ai/dsh-agent": "^0.0.1-rc.5",
     "@deepseek-ai/dsh-attachment": "^0.0.1-rc.5",
     "@deepseek-ai/dsh-brand": "^0.0.1-rc.5",
-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-chat": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
     "@deepseek-ai/dsh-code-runtime": "^0.0.1-rc.1",
     "@deepseek-ai/dsh-invariants": "^0.0.1-rc.5",
     "@deepseek-ai/dsh-llm": "^0.0.1-rc.1",
